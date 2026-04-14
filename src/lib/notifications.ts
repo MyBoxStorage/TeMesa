@@ -102,18 +102,22 @@ export async function sendNotification(params: {
   const email = byChannel.get('EMAIL') ?? DEFAULT_TEMPLATES[trigger].EMAIL
 
   if (whatsapp) {
-    await sendWhatsApp(reservation.guestPhone, interpolateTemplate(whatsapp, vars))
+    try {
+      await sendWhatsApp(reservation.guestPhone, interpolateTemplate(whatsapp, vars))
+    } catch (err) {
+      console.error('[Notifications] WhatsApp falhou:', trigger, reservation.id, (err as Error).message)
+    }
   }
 
   if (email && reservation.guestEmail) {
-    const resend = getResendClient()
-    const from = process.env.RESEND_FROM_EMAIL ?? 'noreply@temesa.app'
-    const subject = `TeMesa • ${trigger}`
-    const text = interpolateTemplate(email, vars)
     try {
+      const resend = getResendClient()
+      const from = process.env.RESEND_FROM_EMAIL ?? 'noreply@temesa.app'
+      const subject = `TeMesa • ${trigger}`
+      const text = interpolateTemplate(email, vars)
       await resend.emails.send({ from, to: reservation.guestEmail, subject, text })
     } catch (err) {
-      console.warn('[Resend] Falha silenciosa:', (err as Error).message)
+      console.error('[Notifications] E-mail falhou:', trigger, reservation.id, (err as Error).message)
     }
   }
 }

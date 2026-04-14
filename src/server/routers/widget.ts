@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
 import { rateLimitOrThrow } from '@/lib/rateLimit'
@@ -5,6 +6,23 @@ import { createWidgetReservation, getWidgetAvailability } from '@/lib/widgetPubl
 import { publicProcedure, router } from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)
+
+/** Converts a RATE_LIMITED error from rateLimitOrThrow into a TRPCError (429). */
+async function checkRateLimit(key: string, limit: number, windowMs: number): Promise<void> {
+  try {
+    await rateLimitOrThrow({ key, limit, windowMs })
+  } catch (err: unknown) {
+    if ((err as any)?.code === 'RATE_LIMITED') {
+      const retry = (err as any).retryAfterSeconds as number
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `Muitas requisições. Tente novamente em ${retry}s.`,
+      })
+    }
+    // Unexpected DB error — log and fail open to avoid blocking legitimate users
+    console.error('[RateLimit] Falha ao verificar limite:', (err as Error).message)
+  }
+}
 
 export const widgetRouter = router({
   getRestaurantInfo: publicProcedure
@@ -17,10 +35,13 @@ export const widgetRouter = router({
     }),
 
   getAvailableSlots: publicProcedure
-    .input(z.object({ slug: z.string(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), partySize: z.number().int().positive() }))
+    .input(z.object({
+      slug: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      partySize: z.number().int().positive(),
+    }))
     .query(async ({ input }) => {
-      // simple in-router limiter: 60/min per pseudo-key (slug+date)
-      rateLimitOrThrow({ key: `widget:availability:${input.slug}:${input.date}`, limit: 60, windowMs: 60_000 })
+      await checkRateLimit(`widget:availability:${input.slug}:${input.date}`, 60, 60_000)
       return getWidgetAvailability({ slug: input.slug, date: input.date, partySize: input.partySize })
     }),
 
@@ -40,7 +61,7 @@ export const widgetRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      rateLimitOrThrow({ key: `widget:create:${input.slug}`, limit: 10, windowMs: 60_000 })
+      await checkRateLimit(`widget:create:${input.slug}`, 10, 60_000)
       return createWidgetReservation({
         slug: input.slug,
         guestName: input.guestName,
@@ -55,4 +76,3 @@ export const widgetRouter = router({
       })
     }),
 })
-

@@ -8,13 +8,14 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+
 // ── ENUMS ────────────────────────────────────────────────────────────────────
 
 enum StaffRole {
-  OWNER    // acesso total
-  MANAGER  // tudo exceto deletar restaurante
-  HOSTESS  // floorplan, reservas, waitlist — sem configurações
-  STAFF    // somente leitura: mesas ocupadas, nome do cliente, garçom atribuído
+  OWNER
+  MANAGER
+  HOSTESS
+  STAFF
 }
 
 enum TableStatus {
@@ -105,19 +106,11 @@ model Restaurant {
   logoUrl            String?
   coverUrl           String?
   themeConfig        Json?
-  // themeConfig: { primaryColor: string, secondaryColor: string,
-  //   accentColor: string, fontFamily: string, borderRadius: string }
   operatingHours     Json
-  // operatingHours: { monday: {open:"12:00",close:"23:00",enabled:true}, ... }
   prepaymentConfig   Json?
-  // prepaymentConfig: null = desativado. Quando ativo:
-  // { type:"POR_PESSOA"|"VALOR_FIXO"|"PERCENTUAL", amountCents:number,
-  //   appliesTo:"TODAS"|"FERIADOS"|"FINAIS_DE_SEMANA"|"MANUAL",
-  //   noShowPolicy:"COBRAR_TOTAL"|"COBRAR_PARCIAL"|"REEMBOLSAR"|"CREDITO",
-  //   cancellationDeadlineHours:number, expirationMinutes:number }
   onboardingStatus   Json      @default("{\"restaurant\":false,\"shifts\":false,\"tables\":false,\"notifications\":false}")
   bcConnectPartnerId String?
-  bcConnectApiKey    String?   // criptografado com ENCRYPTION_KEY
+  bcConnectApiKey    String?
   isActive           Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -149,10 +142,7 @@ model FloorPlan {
   id            String     @id @default(cuid())
   restaurantId  String     @unique
   canvasData    Json
-  // canvasData: Konva stage JSON serializado pelo método stage.toJSON()
-  // Estrutura: { attrs:{width,height}, className:"Stage", children:[{layers}] }
   floorTemplate String     @default("wood")
-  // Valores: wood | marble | dark | black | red | blue | brown | white | gray
   areas         String[]   @default(["Salão"])
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   updatedAt     DateTime   @updatedAt
@@ -176,17 +166,17 @@ model Table {
 }
 
 model Shift {
-  id             String   @id @default(cuid())
-  restaurantId   String
-  name           String
-  startTime      String   // "12:00"
-  endTime        String   // "15:00"
-  daysOfWeek     Int[]    // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
-  maxCapacity    Int?
-  turnDuration   Int      @default(90) // minutos por mesa
-  isActive       Boolean  @default(true)
-  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  reservations   Reservation[]
+  id              String     @id @default(cuid())
+  restaurantId    String
+  name            String
+  startTime       String
+  endTime         String
+  daysOfWeek      Int[]
+  maxCapacity     Int?
+  turnDuration    Int        @default(90)
+  isActive        Boolean    @default(true)
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations    Reservation[]
   waitlistEntries WaitlistEntry[]
 }
 
@@ -198,17 +188,17 @@ model Reservation {
   shiftId               String?
   serverId              String?
   guestName             String
-  guestPhone            String            // E.164 (+5511999999999)
+  guestPhone            String
   guestEmail            String?
   partySize             Int
-  date                  DateTime          // UTC
+  date                  DateTime
   status                ReservationStatus @default(PENDING)
   occasion              String?
   notes                 String?
   dietaryNotes          String?
   source                ReservationSource @default(MANUAL)
-  confirmToken          String?           @unique // nanoid(32)
-  confirmTokenExpiresAt DateTime?         // = date - 1h
+  confirmToken          String?           @unique
+  confirmTokenExpiresAt DateTime?
   lgpdConsent           Boolean           @default(false)
   lgpdConsentAt         DateTime?
   bcConnectSent         Boolean           @default(false)
@@ -228,7 +218,7 @@ model ReservationStatusHistory {
   reservationId String
   fromStatus    ReservationStatus?
   toStatus      ReservationStatus
-  changedBy     String?            // userId ou "SYSTEM"
+  changedBy     String?
   reason        String?
   reservation   Reservation        @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   createdAt     DateTime           @default(now())
@@ -252,7 +242,7 @@ model Customer {
   id               String    @id @default(cuid())
   restaurantId     String
   name             String
-  phone            String    // E.164
+  phone            String
   email            String?
   birthdate        DateTime?
   tags             String[]
@@ -263,7 +253,7 @@ model Customer {
   noShowCount      Int       @default(0)
   visitCount       Int       @default(0)
   totalSpentCents  Int       @default(0)
-  reliabilityScore Float     @default(100) // 0-100
+  reliabilityScore Float     @default(100)
   restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   reservations     Reservation[]
   createdAt        DateTime  @default(now())
@@ -276,14 +266,14 @@ model WaitlistEntry {
   restaurantId     String
   shiftId          String?
   guestName        String
-  guestPhone       String         // E.164
+  guestPhone       String
   guestEmail       String?
   partySize        Int
   date             DateTime
   position         Int
   status           WaitlistStatus @default(WAITING)
   notifiedAt       DateTime?
-  responseDeadline DateTime?      // notifiedAt + 15 min
+  responseDeadline DateTime?
   confirmToken     String?        @unique
   restaurant       Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   shift            Shift?         @relation(fields: [shiftId], references: [id])
@@ -310,8 +300,6 @@ model AutoTag {
   color        String   @default("#6366f1")
   icon         String?
   conditions   Json
-  // conditions: [{ field:"visitCount"|"noShowCount"|"tags"|"occasion"|"source",
-  //                operator:"gte"|"lte"|"eq"|"contains", value:any }]
   isActive     Boolean  @default(true)
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
@@ -321,7 +309,7 @@ model Server {
   id               String   @id @default(cuid())
   restaurantId     String
   name             String
-  userId           String?  // Se o garçom tiver login próprio no sistema
+  userId           String?
   isActive         Boolean  @default(true)
   restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   reservations     Reservation[]
@@ -337,4 +325,16 @@ model ServerTableAssignment {
   server   Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
   table    Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
   @@unique([serverId, tableId, date])
+}
+
+// ── RATE LIMITING ─────────────────────────────────────────────────────────────
+// Used by public widget endpoints. Atomic upsert ensures correctness across
+// serverless instances — no in-memory state needed.
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int      @default(1)
+  resetAt DateTime
+
+  @@map("rate_limit_buckets")
 }

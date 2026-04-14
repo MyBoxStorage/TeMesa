@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-import { protectedProcedure, router } from '@/server/trpc'
+import { staffProcedure, router } from '@/server/trpc'
 
 export const analyticsRouter = router({
-  getDashboard: protectedProcedure
+  getDashboard: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       const now = new Date()
@@ -57,7 +57,7 @@ export const analyticsRouter = router({
       }
     }),
 
-  getOccupancy30Days: protectedProcedure
+  getOccupancy30Days: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       const now = new Date()
@@ -76,7 +76,7 @@ export const analyticsRouter = router({
         .map(([date, covers]) => ({ date, covers, capacity: 0 }))
     }),
 
-  getTopCustomers: protectedProcedure
+  getTopCustomers: staffProcedure
     .input(z.object({ restaurantId: z.string(), limit: z.number().int().positive().optional() }))
     .query(async ({ ctx, input }) => {
       const limit = input.limit ?? 10

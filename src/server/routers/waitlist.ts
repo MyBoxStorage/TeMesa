@@ -3,12 +3,12 @@ import { z } from 'zod'
 import { nanoid } from 'nanoid'
 
 import { sendWhatsApp } from '@/lib/zapi'
-import { publicProcedure, hostessProcedure, managerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { publicProcedure, hostessProcedure, managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)
 
 export const waitlistRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(z.object({ restaurantId: z.string(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
     .query(async ({ ctx, input }) => {
       const start = new Date(`${input.date}T00:00:00.000Z`)

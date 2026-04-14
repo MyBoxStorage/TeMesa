@@ -2,10 +2,10 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 
 import { sendBcEvent } from '@/lib/bcconnect'
-import { managerProcedure, ownerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { managerProcedure, ownerProcedure, staffProcedure, router } from '@/server/trpc'
 
 export const customersRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(
       z.object({
         restaurantId: z.string(),
@@ -32,7 +32,7 @@ export const customersRouter = router({
       })
     }),
 
-  getById: protectedProcedure
+  getById: staffProcedure
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await ctx.prisma.customer.findFirst({
@@ -59,7 +59,7 @@ export const customersRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const updated = await ctx.prisma.customer.update({
-        where: { id: input.customerId },
+        where: { id: input.customerId, restaurantId: input.restaurantId },
         data: {
           name: input.name,
           email: input.email ?? undefined,
@@ -125,7 +125,7 @@ export const customersRouter = router({
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.customer.update({
-        where: { id: input.customerId },
+        where: { id: input.customerId, restaurantId: input.restaurantId },
         data: {
           name: 'Anonimizado',
           phone: '00000000000',

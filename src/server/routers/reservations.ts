@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid'
 import { sendNotification } from '@/lib/notifications'
 import { sendBcEvent } from '@/lib/bcconnect'
 import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, reliabilityScore } from '@/lib/reservationRules'
-import { hostessProcedure, protectedProcedure, publicProcedure, router } from '@/server/trpc'
+import { hostessProcedure, protectedProcedure, staffProcedure, publicProcedure, router } from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)
 
@@ -135,7 +135,7 @@ async function createReservationCore(params: {
 }
 
 export const reservationsRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(
       z.object({
         restaurantId: z.string(),
@@ -181,7 +181,7 @@ export const reservationsRouter = router({
       })
     }),
 
-  getById: protectedProcedure
+  getById: staffProcedure
     .input(z.object({ restaurantId: z.string(), reservationId: z.string() }))
     .query(async ({ ctx, input }) => {
       const res = await ctx.prisma.reservation.findFirst({
@@ -334,9 +334,21 @@ export const reservationsRouter = router({
         include: { restaurant: true, customer: true },
       })
       if (!reservation) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      // Only allow cancelling reservations that are still in a cancellable state
+      const cancellable: string[] = ['PENDING', 'PENDING_PAYMENT', 'CONFIRMED']
+      if (!cancellable.includes(reservation.status)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Esta reserva não pode mais ser cancelada' })
+      }
+
       const updated = await ctx.prisma.reservation.update({
         where: { id: reservation.id },
-        data: { status: 'CANCELLED' },
+        data: {
+          status: 'CANCELLED',
+          statusHistory: {
+            create: { fromStatus: reservation.status, toStatus: 'CANCELLED', changedBy: 'GUEST' },
+          },
+        },
         include: { restaurant: true, customer: true },
       })
       await sendNotification({ restaurantId: updated.restaurantId, trigger: 'CANCELLED', reservation: updated })

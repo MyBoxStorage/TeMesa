@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-import { managerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 export const serversRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.server.findMany({
@@ -28,8 +28,9 @@ export const serversRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // restaurantId scopes the update — prevents cross-tenant modification
       return ctx.prisma.server.update({
-        where: { id: input.serverId },
+        where: { id: input.serverId, restaurantId: input.restaurantId },
         data: { name: input.name, isActive: input.isActive },
       })
     }),
@@ -57,11 +58,15 @@ export const serversRouter = router({
       return { ok: true }
     }),
 
-  getTodayAssignments: protectedProcedure
+  getTodayAssignments: staffProcedure
     .input(z.object({ restaurantId: z.string(), date: z.coerce.date() }))
     .query(async ({ ctx, input }) => {
+      // Filter by restaurantId through the server relation to prevent cross-tenant leaks
       const rows = await ctx.prisma.serverTableAssignment.findMany({
-        where: { date: input.date },
+        where: {
+          date: input.date,
+          server: { restaurantId: input.restaurantId },
+        },
         include: { server: { select: { id: true, name: true } } },
       })
       const map: Record<string, { server: { id: string; name: string } }> = {}
@@ -69,4 +74,3 @@ export const serversRouter = router({
       return map
     }),
 })
-

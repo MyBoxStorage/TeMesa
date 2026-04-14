@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
-import { publicProcedure, managerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { publicProcedure, managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 const hhmm = z.string().regex(/^\d{2}:\d{2}$/)
 
 export const shiftsRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.shift.findMany({
@@ -58,7 +58,7 @@ export const shiftsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.shift.update({
-        where: { id: input.shiftId },
+        where: { id: input.shiftId, restaurantId: input.restaurantId },
         data: {
           name: input.name,
           startTime: input.startTime,
@@ -74,7 +74,7 @@ export const shiftsRouter = router({
   delete: managerProcedure
     .input(z.object({ restaurantId: z.string(), shiftId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.shift.update({ where: { id: input.shiftId }, data: { isActive: false } })
+      return ctx.prisma.shift.update({ where: { id: input.shiftId, restaurantId: input.restaurantId }, data: { isActive: false } })
     }),
 
   getAvailableSlots: publicProcedure

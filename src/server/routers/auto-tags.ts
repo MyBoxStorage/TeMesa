@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { managerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 const conditionSchema = z.object({
   field: z.string(),
@@ -9,7 +9,7 @@ const conditionSchema = z.object({
 })
 
 export const autoTagsRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.autoTag.findMany({
@@ -55,7 +55,7 @@ export const autoTagsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.autoTag.update({
-        where: { id: input.autoTagId },
+        where: { id: input.autoTagId, restaurantId: input.restaurantId },
         data: {
           name: input.name,
           color: input.color,
@@ -69,7 +69,7 @@ export const autoTagsRouter = router({
   delete: managerProcedure
     .input(z.object({ restaurantId: z.string(), autoTagId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.autoTag.delete({ where: { id: input.autoTagId } })
+      await ctx.prisma.autoTag.delete({ where: { id: input.autoTagId, restaurantId: input.restaurantId } })
       return { ok: true }
     }),
 

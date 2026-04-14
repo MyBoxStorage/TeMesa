@@ -1,21 +1,36 @@
 import { notFound } from 'next/navigation'
-
 import { prisma } from '@/lib/prisma'
+import { BookingWidget } from '@/components/widget/booking-widget'
 
-export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+export default async function WidgetPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug },
-    select: { name: true, slug: true },
+    select: {
+      id: true, name: true, slug: true,
+      logoUrl: true, coverUrl: true,
+      themeConfig: true, operatingHours: true,
+    },
   })
   if (!restaurant) notFound()
 
+  const theme = (restaurant.themeConfig as any) ?? {
+    primaryColor: '#000000', accentColor: '#000000',
+    fontFamily: 'Figtree', borderRadius: '0.5rem',
+  }
+
   return (
-    <div className="mx-auto max-w-3xl p-8 space-y-3">
-      <h1 className="text-2xl font-semibold">{restaurant.name}</h1>
-      <p className="text-sm text-zinc-600">
-        Widget público (iframe) — placeholder. Slug: <span className="font-mono">{restaurant.slug}</span>
-      </p>
-    </div>
+    <>
+      <style>{`
+        :root {
+          --widget-primary: ${theme.primaryColor};
+          --widget-accent:  ${theme.accentColor ?? theme.primaryColor};
+          --widget-radius:  ${theme.borderRadius ?? '0.5rem'};
+          --widget-font:    ${theme.fontFamily ?? 'Figtree'};
+        }
+        body { font-family: var(--widget-font), sans-serif; background: #0a0a0a; }
+      `}</style>
+      <BookingWidget restaurant={restaurant as any} />
+    </>
   )
 }

@@ -1,63 +1,101 @@
-import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
-import { UserButton } from '@clerk/nextjs'
+'use client'
 
-import { prisma } from '@/lib/prisma'
+import { useState, createContext, useContext, useEffect } from 'react'
+import { Sidebar } from '@/components/dashboard/sidebar'
+import { DashboardHeader } from '@/components/dashboard/header'
+import { api } from '@/trpc/react'
+import type { StaffRole } from '@prisma/client'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+interface RestaurantOption {
+  id:   string
+  name: string
+  role: StaffRole
+}
 
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } })
-  if (!user) redirect('/onboarding')
+interface DashboardCtx {
+  date:              Date
+  setDate:           (d: Date) => void
+  shift:             string
+  setShift:          (s: string) => void
+  restaurantId:      string
+  setRestaurantId:   (id: string) => void
+  restaurants:       RestaurantOption[]
+  userRole:          StaffRole | null
+}
 
-  const membership = await prisma.userRestaurant.findFirst({
-    where: { userId: user.id },
-    include: { restaurant: true },
-    orderBy: { createdAt: 'asc' },
-  })
+export const DashboardContext = createContext<DashboardCtx>({
+  date:            new Date(),
+  setDate:         () => {},
+  shift:           'all',
+  setShift:        () => {},
+  restaurantId:    '',
+  setRestaurantId: () => {},
+  restaurants:     [],
+  userRole:        null,
+})
 
-  if (!membership?.restaurant) redirect('/onboarding')
+export function useDashboard() {
+  return useContext(DashboardContext)
+}
 
-  const onboarding = membership.restaurant.onboardingStatus as unknown
-  const needsOnboarding =
-    onboarding &&
-    typeof onboarding === 'object' &&
-    'restaurant' in onboarding &&
-    (onboarding as { restaurant?: boolean }).restaurant === false
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [date, setDate]               = useState(new Date())
+  const [shift, setShift]             = useState('all')
+  const [restaurantId, setRestaurantId] = useState('')
 
-  // Evita loop: onboarding é rota pública fora do grupo (dashboard)
-  if (needsOnboarding) redirect('/onboarding')
+  const { data: memberships, isLoading } = api.restaurant.getMyRestaurants.useQuery()
 
-  const nav = [
-    { href: '/dashboard/reservas', label: 'Reservas' },
-    { href: '/dashboard/mesas', label: 'Mesas' },
-    { href: '/dashboard/waitlist', label: 'Waitlist' },
-    { href: '/dashboard/clientes', label: 'Clientes' },
-    { href: '/dashboard/garcons', label: 'Garçons' },
-    { href: '/dashboard/relatorios', label: 'Relatórios' },
-    { href: '/dashboard/configuracoes', label: 'Configurações' },
-  ] as const
+  // Set first restaurant as default
+  useEffect(() => {
+    if (memberships && memberships.length > 0 && !restaurantId) {
+      setRestaurantId(memberships[0].restaurant.id)
+    }
+  }, [memberships, restaurantId])
+
+  const restaurants: RestaurantOption[] = (memberships ?? []).map(m => ({
+    id:   m.restaurant.id,
+    name: m.restaurant.name,
+    role: m.role,
+  }))
+
+  const userRole = restaurants.find(r => r.id === restaurantId)?.role ?? null
 
   return (
-    <div className="min-h-dvh flex flex-col">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="font-semibold">TeMesa</div>
-            <nav className="hidden flex-wrap gap-3 text-sm text-zinc-700 md:flex">
-              {nav.map((item) => (
-                <Link key={item.href} className="hover:text-black" href={item.href}>
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-          <UserButton />
+    <DashboardContext.Provider value={{
+      date, setDate,
+      shift, setShift,
+      restaurantId, setRestaurantId,
+      restaurants,
+      userRole,
+    }}>
+      <div className="flex h-screen bg-background overflow-hidden dark">
+        <Sidebar />
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <DashboardHeader
+            date={date}
+            onDateChange={setDate}
+            shift={shift}
+            onShiftChange={setShift}
+            restaurants={restaurants}
+            selectedRestaurantId={restaurantId}
+            onRestaurantChange={setRestaurantId}
+          />
+          <main className="flex-1 overflow-y-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
+              </div>
+            ) : !restaurantId ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3">
+                <p className="text-sm text-muted-foreground">Nenhum restaurante encontrado.</p>
+                <a href="/onboarding" className="text-sm underline text-primary">Criar restaurante</a>
+              </div>
+            ) : (
+              children
+            )}
+          </main>
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-    </div>
+      </div>
+    </DashboardContext.Provider>
   )
 }

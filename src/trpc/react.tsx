@@ -10,6 +10,9 @@ import type { AppRouter } from '@/server/root-router'
 
 export const trpc = createTRPCReact<AppRouter>()
 
+// Alias `api` para compatibilidade com todos os componentes
+export const api = trpc
+
 function getBaseUrl() {
   if (typeof window !== 'undefined') return ''
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
@@ -17,7 +20,11 @@ function getBaseUrl() {
 }
 
 export function TrpcProvider(props: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient())
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: 30_000, retry: 1 },
+    },
+  }))
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [

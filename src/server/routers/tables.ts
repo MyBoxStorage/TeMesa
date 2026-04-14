@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
-import { hostessProcedure, managerProcedure, ownerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { hostessProcedure, managerProcedure, ownerProcedure, staffProcedure, router } from '@/server/trpc'
 
 export const tablesRouter = router({
-  list: protectedProcedure
+  list: staffProcedure
     .input(z.object({ restaurantId: z.string(), area: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.table.findMany({
@@ -48,7 +48,7 @@ export const tablesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { tableId, ...data } = input
-      return ctx.prisma.table.update({ where: { id: tableId }, data: { ...(data as any) } })
+      return ctx.prisma.table.update({ where: { id: tableId, restaurantId: input.restaurantId }, data: { ...(data as any) } })
     }),
 
   updateStatus: hostessProcedure

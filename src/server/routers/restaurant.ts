@@ -55,6 +55,15 @@ export const restaurantRouter = router({
     return membership?.restaurant ?? null
   }),
 
+  getMyRestaurants: protectedProcedure.query(async ({ ctx }) => {
+    const memberships = await ctx.prisma.userRestaurant.findMany({
+      where: { userId: ctx.user.id },
+      include: { restaurant: true },
+      orderBy: { createdAt: 'asc' },
+    })
+    return memberships.map(m => ({ restaurant: m.restaurant, role: m.role }))
+  }),
+
   update: ownerProcedure
     .input(
       z.object({
@@ -109,7 +118,7 @@ export const restaurantRouter = router({
       })
     }),
 
-  updateOnboardingStep: protectedProcedure
+  updateOnboardingStep: ownerProcedure
     .input(
       z.object({
         restaurantId: z.string(),
@@ -146,4 +155,3 @@ export const restaurantRouter = router({
       })
     }),
 })
-

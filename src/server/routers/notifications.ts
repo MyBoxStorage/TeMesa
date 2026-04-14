@@ -2,10 +2,10 @@ import { z } from 'zod'
 
 import { sendWhatsApp } from '@/lib/zapi'
 import { DEFAULT_TEMPLATES } from '@/lib/notifications'
-import { managerProcedure, protectedProcedure, router } from '@/server/trpc'
+import { managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 export const notificationsRouter = router({
-  listTemplates: protectedProcedure
+  listTemplates: staffProcedure
     .input(z.object({ restaurantId: z.string() }))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.notificationTemplate.findMany({
