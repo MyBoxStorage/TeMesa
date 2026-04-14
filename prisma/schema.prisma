@@ -1,0 +1,340 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum StaffRole {
+  OWNER    // acesso total
+  MANAGER  // tudo exceto deletar restaurante
+  HOSTESS  // floorplan, reservas, waitlist — sem configurações
+  STAFF    // somente leitura: mesas ocupadas, nome do cliente, garçom atribuído
+}
+
+enum TableStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  WAITING
+  BLOCKED
+}
+
+enum TableShape {
+  SQUARE
+  ROUND
+  RECTANGLE
+  BOOTH
+  LONG_RECTANGLE
+}
+
+enum ReservationStatus {
+  PENDING
+  PENDING_PAYMENT
+  CONFIRMED
+  CHECKED_IN
+  FINISHED
+  NO_SHOW
+  CANCELLED
+}
+
+enum ReservationSource {
+  MANUAL
+  WIDGET
+  WHATSAPP
+  IFOOD
+  PHONE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  PARTIAL_REFUND
+  EXPIRED
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  CONFIRMED
+  DECLINED
+  EXPIRED
+}
+
+enum NotificationTrigger {
+  RESERVATION_CREATED
+  REMINDER_24H
+  REMINDER_2H
+  PAYMENT_CONFIRMED
+  WAITLIST_AVAILABLE
+  POST_VISIT
+  CANCELLED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+}
+
+// ── MODELS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id          String           @id @default(cuid())
+  clerkId     String           @unique
+  email       String           @unique
+  name        String
+  phone       String?
+  createdAt   DateTime         @default(now())
+  restaurants UserRestaurant[]
+}
+
+model Restaurant {
+  id                 String    @id @default(cuid())
+  name               String
+  slug               String    @unique
+  cnpj               String?
+  phone              String
+  address            Json
+  timezone           String    @default("America/Sao_Paulo")
+  logoUrl            String?
+  coverUrl           String?
+  themeConfig        Json?
+  // themeConfig: { primaryColor: string, secondaryColor: string,
+  //   accentColor: string, fontFamily: string, borderRadius: string }
+  operatingHours     Json
+  // operatingHours: { monday: {open:"12:00",close:"23:00",enabled:true}, ... }
+  prepaymentConfig   Json?
+  // prepaymentConfig: null = desativado. Quando ativo:
+  // { type:"POR_PESSOA"|"VALOR_FIXO"|"PERCENTUAL", amountCents:number,
+  //   appliesTo:"TODAS"|"FERIADOS"|"FINAIS_DE_SEMANA"|"MANUAL",
+  //   noShowPolicy:"COBRAR_TOTAL"|"COBRAR_PARCIAL"|"REEMBOLSAR"|"CREDITO",
+  //   cancellationDeadlineHours:number, expirationMinutes:number }
+  onboardingStatus   Json      @default("{\"restaurant\":false,\"shifts\":false,\"tables\":false,\"notifications\":false}")
+  bcConnectPartnerId String?
+  bcConnectApiKey    String?   // criptografado com ENCRYPTION_KEY
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  users                 UserRestaurant[]
+  tables                Table[]
+  floorPlan             FloorPlan?
+  shifts                Shift[]
+  reservations          Reservation[]
+  customers             Customer[]
+  waitlistEntries       WaitlistEntry[]
+  notificationTemplates NotificationTemplate[]
+  autoTags              AutoTag[]
+  servers               Server[]
+}
+
+model UserRestaurant {
+  id           String     @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         StaffRole  @default(STAFF)
+  createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@unique([userId, restaurantId])
+}
+
+model FloorPlan {
+  id            String     @id @default(cuid())
+  restaurantId  String     @unique
+  canvasData    Json
+  // canvasData: Konva stage JSON serializado pelo método stage.toJSON()
+  // Estrutura: { attrs:{width,height}, className:"Stage", children:[{layers}] }
+  floorTemplate String     @default("wood")
+  // Valores: wood | marble | dark | black | red | blue | brown | white | gray
+  areas         String[]   @default(["Salão"])
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime   @updatedAt
+}
+
+model Table {
+  id                String      @id @default(cuid())
+  restaurantId      String
+  name              String
+  capacity          Int
+  minCapacity       Int         @default(1)
+  area              String?
+  posX              Float       @default(0)
+  posY              Float       @default(0)
+  shape             TableShape  @default(SQUARE)
+  rotation          Float       @default(0)
+  status            TableStatus @default(AVAILABLE)
+  restaurant        Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations      Reservation[]
+  serverAssignments ServerTableAssignment[]
+}
+
+model Shift {
+  id             String   @id @default(cuid())
+  restaurantId   String
+  name           String
+  startTime      String   // "12:00"
+  endTime        String   // "15:00"
+  daysOfWeek     Int[]    // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
+  maxCapacity    Int?
+  turnDuration   Int      @default(90) // minutos por mesa
+  isActive       Boolean  @default(true)
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations   Reservation[]
+  waitlistEntries WaitlistEntry[]
+}
+
+model Reservation {
+  id                    String            @id @default(cuid())
+  restaurantId          String
+  customerId            String?
+  tableId               String?
+  shiftId               String?
+  serverId              String?
+  guestName             String
+  guestPhone            String            // E.164 (+5511999999999)
+  guestEmail            String?
+  partySize             Int
+  date                  DateTime          // UTC
+  status                ReservationStatus @default(PENDING)
+  occasion              String?
+  notes                 String?
+  dietaryNotes          String?
+  source                ReservationSource @default(MANUAL)
+  confirmToken          String?           @unique // nanoid(32)
+  confirmTokenExpiresAt DateTime?         // = date - 1h
+  lgpdConsent           Boolean           @default(false)
+  lgpdConsentAt         DateTime?
+  bcConnectSent         Boolean           @default(false)
+  statusHistory         ReservationStatusHistory[]
+  prepayment            PrepaymentRecord?
+  restaurant            Restaurant        @relation(fields: [restaurantId], references: [id])
+  customer              Customer?         @relation(fields: [customerId], references: [id])
+  table                 Table?            @relation(fields: [tableId], references: [id])
+  shift                 Shift?            @relation(fields: [shiftId], references: [id])
+  server                Server?           @relation(fields: [serverId], references: [id])
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+}
+
+model ReservationStatusHistory {
+  id            String             @id @default(cuid())
+  reservationId String
+  fromStatus    ReservationStatus?
+  toStatus      ReservationStatus
+  changedBy     String?            // userId ou "SYSTEM"
+  reason        String?
+  reservation   Reservation        @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime           @default(now())
+}
+
+model PrepaymentRecord {
+  id             String        @id @default(cuid())
+  reservationId  String        @unique
+  amountCents    Int
+  status         PaymentStatus @default(PENDING)
+  pixCode        String?
+  pixQrCodeUrl   String?
+  pagarmeOrderId String?
+  paidAt         DateTime?
+  refundedAt     DateTime?
+  expiresAt      DateTime?
+  reservation    Reservation   @relation(fields: [reservationId], references: [id])
+}
+
+model Customer {
+  id               String    @id @default(cuid())
+  restaurantId     String
+  name             String
+  phone            String    // E.164
+  email            String?
+  birthdate        DateTime?
+  tags             String[]
+  preferences      Json?
+  notes            String?
+  lgpdConsent      Boolean   @default(false)
+  lgpdConsentAt    DateTime?
+  noShowCount      Int       @default(0)
+  visitCount       Int       @default(0)
+  totalSpentCents  Int       @default(0)
+  reliabilityScore Float     @default(100) // 0-100
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations     Reservation[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  @@unique([restaurantId, phone])
+}
+
+model WaitlistEntry {
+  id               String         @id @default(cuid())
+  restaurantId     String
+  shiftId          String?
+  guestName        String
+  guestPhone       String         // E.164
+  guestEmail       String?
+  partySize        Int
+  date             DateTime
+  position         Int
+  status           WaitlistStatus @default(WAITING)
+  notifiedAt       DateTime?
+  responseDeadline DateTime?      // notifiedAt + 15 min
+  confirmToken     String?        @unique
+  restaurant       Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  shift            Shift?         @relation(fields: [shiftId], references: [id])
+  createdAt        DateTime       @default(now())
+}
+
+model NotificationTemplate {
+  id           String              @id @default(cuid())
+  restaurantId String
+  trigger      NotificationTrigger
+  channel      NotificationChannel
+  templatePtBr String
+  templateEn   String?
+  templateEs   String?
+  isActive     Boolean             @default(true)
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  @@unique([restaurantId, trigger, channel])
+}
+
+model AutoTag {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String
+  color        String   @default("#6366f1")
+  icon         String?
+  conditions   Json
+  // conditions: [{ field:"visitCount"|"noShowCount"|"tags"|"occasion"|"source",
+  //                operator:"gte"|"lte"|"eq"|"contains", value:any }]
+  isActive     Boolean  @default(true)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+model Server {
+  id               String   @id @default(cuid())
+  restaurantId     String
+  name             String
+  userId           String?  // Se o garçom tiver login próprio no sistema
+  isActive         Boolean  @default(true)
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations     Reservation[]
+  tableAssignments ServerTableAssignment[]
+}
+
+model ServerTableAssignment {
+  id       String   @id @default(cuid())
+  serverId String
+  tableId  String
+  date     DateTime @db.Date
+  shiftId  String?
+  server   Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  table    Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  @@unique([serverId, tableId, date])
+}
