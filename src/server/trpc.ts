@@ -92,6 +92,17 @@ export const enforceRestaurantRole = (minRole: StaffRole) =>
   })
 
 export const protectedProcedure = t.procedure.use(enforceAuth)
+
+// adminProcedure: authenticated + isAdmin flag on the User record.
+// Only platform super-admins can call these procedures.
+const enforceAdmin = enforceAuth.unstable_pipe(async ({ ctx, next }) => {
+  const authedCtx = ctx as typeof ctx & { user: User }
+  if (!authedCtx.user.isAdmin) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso restrito a administradores da plataforma' })
+  }
+  return next({ ctx: { ...ctx, user: authedCtx.user } })
+})
+export const adminProcedure = t.procedure.use(enforceAdmin)
 // staffProcedure: authenticated + member of the restaurant at any role level.
 // Use for all read endpoints that accept restaurantId — prevents cross-tenant data leaks.
 export const staffProcedure     = t.procedure.use(enforceRestaurantRole('STAFF'))

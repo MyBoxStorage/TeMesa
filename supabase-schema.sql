@@ -223,7 +223,37 @@ INSERT INTO "_prisma_migrations" ("id","checksum","finished_at","migration_name"
 VALUES ('temesa-init','0000000000000000000000000000000000000000000000000000000000000000',NOW(),'temesa_init',NULL,NULL,NOW(),1)
 ON CONFLICT DO NOTHING;
 
--- ── RATE LIMITING ──────────────────────────────────────────────────────────────
+-- ── ADMIN & INVITATIONS ───────────────────────────────────────────────────────
+
+-- Add isAdmin flag to existing User table
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isAdmin" BOOLEAN NOT NULL DEFAULT false;
+
+-- Add plan field to existing Restaurant table
+ALTER TABLE "Restaurant" ADD COLUMN IF NOT EXISTS "plan" TEXT NOT NULL DEFAULT 'GRATUITO';
+
+-- InvitationStatus enum
+DO $$ BEGIN
+  CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'USED', 'EXPIRED', 'REVOKED');
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- Invitation table
+CREATE TABLE IF NOT EXISTS "Invitation" (
+  "id"             TEXT        NOT NULL PRIMARY KEY,
+  "email"          TEXT        NOT NULL,
+  "restaurantName" TEXT        NOT NULL,
+  "token"          TEXT        NOT NULL UNIQUE,
+  "status"         "InvitationStatus" NOT NULL DEFAULT 'PENDING',
+  "expiresAt"      TIMESTAMP(3) NOT NULL,
+  "usedAt"         TIMESTAMP(3),
+  "notes"          TEXT,
+  "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "Invitation_email_idx" ON "Invitation"("email");
+CREATE INDEX IF NOT EXISTS "Invitation_token_idx" ON "Invitation"("token");
+
+-- How to make yourself admin (run after first sign-up):
+-- UPDATE "User" SET "isAdmin" = true WHERE email = 'seu@email.com';
 -- Tabela de contadores para rate limiting serverless (widget público).
 -- Upsert atômico garante corretude entre múltiplas instâncias do Vercel.
 CREATE TABLE IF NOT EXISTS rate_limit_buckets (

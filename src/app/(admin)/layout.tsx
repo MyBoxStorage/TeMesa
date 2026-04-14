@@ -1,0 +1,65 @@
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
+import { UtensilsCrossed, LayoutDashboard, Building2, Mail, ArrowLeft } from 'lucide-react'
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { userId: clerkUserId } = await auth()
+  if (!clerkUserId) redirect('/sign-in')
+
+  const user = await prisma.user.findUnique({ where: { clerkId: clerkUserId } })
+  if (!user?.isAdmin) redirect('/dashboard/reservas')
+
+  return (
+    <div className="flex h-screen bg-[#0a0a0a] text-white overflow-hidden">
+
+      {/* Sidebar */}
+      <aside className="w-56 shrink-0 border-r border-zinc-800 flex flex-col">
+        <div className="p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
+              <UtensilsCrossed className="w-4 h-4 text-black" />
+            </div>
+            <div>
+              <p className="text-[13px] font-bold tracking-tight">TeMesa</p>
+              <p className="text-[10px] text-red-400 font-medium">Admin</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-3 space-y-1">
+          {[
+            { href: '/admin',              icon: LayoutDashboard, label: 'Dashboard'    },
+            { href: '/admin/restaurantes', icon: Building2,       label: 'Restaurantes' },
+            { href: '/admin/convites',     icon: Mail,            label: 'Convites'     },
+          ].map(({ href, icon: Icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-zinc-800">
+          <Link
+            href="/dashboard/reservas"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Voltar ao painel
+          </Link>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto">
+        {children}
+      </main>
+    </div>
+  )
+}

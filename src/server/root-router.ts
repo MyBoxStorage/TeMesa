@@ -12,6 +12,7 @@ import { notificationsRouter } from '@/server/routers/notifications'
 import { autoTagsRouter } from '@/server/routers/auto-tags'
 import { analyticsRouter } from '@/server/routers/analytics'
 import { widgetRouter } from '@/server/routers/widget'
+import { adminRouter } from '@/server/routers/admin'
 
 export const appRouter = router({
   restaurant: restaurantRouter,
@@ -26,6 +27,7 @@ export const appRouter = router({
   autoTags: autoTagsRouter,
   analytics: analyticsRouter,
   widget: widgetRouter,
+  admin: adminRouter,
 })
 
 export type AppRouter = typeof appRouter

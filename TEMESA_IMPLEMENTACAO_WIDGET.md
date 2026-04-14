@@ -1,8 +1,8 @@
-# TeMesa — Guia Completo de Implementação do Widget em um Site de Restaurante
+# TeMesa — Guia Completo de Implementação em Produção
 
 > **Para agentes de IA e desenvolvedores.**
-> Este documento descreve passo a passo como conectar um site de restaurante à plataforma TeMesa, ativando o sistema de reservas online com confirmação automática via WhatsApp.
-> Siga a ordem exata. Não pule etapas.
+> Documento validado em produção — abril 2026.
+> Inclui todas as correções e armadilhas encontradas durante o deploy real.
 
 ---
 
@@ -17,10 +17,13 @@
 7. [Configurando notificações WhatsApp](#7-configurando-notificações-whatsapp)
 8. [Obtendo a URL e o código de embed](#8-obtendo-a-url-e-o-código-de-embed)
 9. [Adicionando ao site do restaurante](#9-adicionando-ao-site-do-restaurante)
-10. [Testando o fluxo completo](#10-testando-o-fluxo-completo)
-11. [Configurações opcionais](#11-configurações-opcionais)
-12. [Referência de variáveis de ambiente](#12-referência-de-variáveis-de-ambiente)
-13. [Troubleshooting](#13-troubleshooting)
+10. [Deploy em produção — Netlify](#10-deploy-em-produção--netlify)
+11. [Variáveis de ambiente — referência completa](#11-variáveis-de-ambiente--referência-completa)
+12. [Banco de dados — setup inicial](#12-banco-de-dados--setup-inicial)
+13. [Crons externos — cron-job.org](#13-crons-externos--cron-joborg)
+14. [Testando o fluxo completo](#14-testando-o-fluxo-completo)
+15. [Configurações opcionais](#15-configurações-opcionais)
+16. [Troubleshooting — erros conhecidos](#16-troubleshooting--erros-conhecidos)
 
 ---
 
@@ -30,327 +33,178 @@
 Site do restaurante
   └── <iframe> ou <a href> apontando para:
 
-TeMesa (https://temesa.app)
+TeMesa (https://seu-app.netlify.app)
   └── /r/[slug]                    ← Widget público de reservas
         ├── Passo 1: Pessoas + Data
-        ├── Passo 2: Horários disponíveis (via API tRPC)
+        ├── Passo 2: Horários disponíveis (via tRPC)
         ├── Passo 3: Dados do cliente + LGPD
         └── Passo 4: Confirmação
 
-  └── /confirmar/[token]           ← Página de confirmação/cancelamento
-        ├── GET  → exibe reserva
-        ├── POST → confirma presença
-        └── POST → cancela reserva
+  └── /confirmar/[token]           ← Confirmação/cancelamento pelo cliente
+  └── /dashboard/reservas          ← Painel do operador
+  └── /onboarding                  ← Cadastro de novo restaurante
 
-Banco de dados (Supabase/PostgreSQL)
-  └── Todos os dados isolados por restaurantId (multi-tenant)
-
-Notificações
-  ├── Z-API (WhatsApp Business) → cliente recebe confirmação, lembretes
-  └── Resend (e-mail) → confirmação e lembretes (se e-mail fornecido)
+Stack:
+  Next.js 16 (App Router + Turbopack)
+  tRPC + Prisma + PostgreSQL (Supabase)
+  Clerk (autenticação multi-tenant)
+  Z-API (WhatsApp Business)
+  Resend (e-mail)
+  Netlify (deploy)
 ```
-
-**O widget é uma página Next.js hospedada no domínio TeMesa.** O site do restaurante apenas aponta para ela via `<iframe>` ou botão com link externo. Não há instalação de código no site do restaurante além de um único trecho HTML.
 
 ---
 
 ## 2. Pré-requisitos
 
-Antes de começar, confirme que os itens abaixo estão disponíveis:
-
 | Item | Onde obter | Obrigatório |
 |---|---|---|
-| Conta no TeMesa | `https://temesa.app/sign-up` | ✅ |
-| Número de WhatsApp Business ativo | Meta Business / Z-API | ✅ |
-| Credenciais Z-API (Instance ID + Token) | `https://z-api.io` | ✅ |
-| Nome e slug do restaurante (ex: `bela-vista`) | Definido no cadastro | ✅ |
-| Logo e cor primária do restaurante | Arquivo PNG/JPEG + hex da cor | Recomendado |
-| Conta Resend para e-mails | `https://resend.com` | Opcional |
-
-> **Slug:** identificador único do restaurante na URL. Deve ter apenas letras minúsculas, números e hífens. Exemplo: `restaurante-bela-vista`. Este valor define a URL final do widget: `https://temesa.app/r/restaurante-bela-vista`.
+| Conta Netlify | netlify.com | ✅ |
+| Conta Supabase | supabase.com | ✅ |
+| Conta Clerk | clerk.com | ✅ |
+| Número WhatsApp Business + Z-API | z-api.io | ✅ |
+| Netlify CLI instalado | `npm install -g netlify-cli` | ✅ |
+| Conta Resend | resend.com | Recomendado |
+| Conta cron-job.org | cron-job.org | Recomendado |
 
 ---
 
 ## 3. Criando a conta e o restaurante
 
-### 3.1 Cadastro na plataforma
+### 3.1 Cadastro
 
-1. Acesse `https://temesa.app/sign-up`
-2. Crie uma conta com e-mail e senha (ou Google)
-3. Após o login, o sistema redireciona automaticamente para `/onboarding`
+1. Acesse `https://seu-app.netlify.app/sign-up`
+2. Crie conta com e-mail e senha (ou Google)
+3. O sistema redireciona para `/onboarding`
 
-### 3.2 Onboarding — Passo 1: Dados do restaurante
+### 3.2 Onboarding — Passo 1
 
-Preencha o formulário com:
-
+Preencha:
 ```
-Nome do restaurante: [Nome exato que aparecerá no widget]
+Nome do restaurante: [Nome exibido no widget]
 Slug (URL do widget): [ex: restaurante-bela-vista]
 Telefone WhatsApp:   [ex: +55 47 99999-9999]
 ```
 
-> **Atenção ao slug:** ele não pode ser alterado depois sem suporte. Escolha cuidadosamente. Use apenas letras minúsculas, números e hífens. Sem acentos, sem espaços.
+> **Slug:** use apenas letras minúsculas, números e hífens. Sem acentos. Define a URL: `https://seu-app.netlify.app/r/[slug]`.
 
-Clique em **Criar restaurante**. O sistema cria automaticamente:
-- O perfil do restaurante no banco
-- Os templates de notificação padrão (WhatsApp + e-mail)
-- O acesso de OWNER para o usuário criador
+### 3.3 Passos 2, 3 e 4 do onboarding
 
-### 3.3 Onboarding — Passos 2, 3 e 4
-
-Os passos de Turnos, Mesas e Notificações no onboarding são informativos. Clique **Pular por agora** em todos — a configuração real é feita nas seções seguintes com mais detalhes.
-
-Ao chegar no passo 4, clique **Concluir** para ser redirecionado ao painel.
+Clique **Pular por agora** em todos — configure em detalhe nas seções seguintes.
 
 ---
 
 ## 4. Configurando turnos
 
-Os turnos definem **quando** o widget exibe horários disponíveis para reserva. Sem ao menos um turno ativo, o widget mostra "Sem disponibilidade" para qualquer data.
+**Configurações → Turnos**
 
-### 4.1 Acessar configuração de turnos
-
-No painel, vá em **Configurações → Turnos**.
-
-### 4.2 Criar um turno
-
-Para cada período de atendimento (ex: Almoço, Jantar), crie um turno separado:
+Sem ao menos um turno ativo, o widget mostra "Sem disponibilidade" para qualquer data.
 
 | Campo | Descrição | Exemplo |
 |---|---|---|
-| Nome | Nome exibido no widget | `Almoço` |
-| Horário início | Formato HH:MM | `12:00` |
-| Horário fim | Formato HH:MM | `15:00` |
-| Dias da semana | Checkboxes de 0 (Dom) a 6 (Sáb) | `2,3,4,5,6` (Seg–Sáb) |
-| Capacidade máxima | Total de **pessoas** aceitas no turno | `60` |
-| Duração do giro | Tempo médio de permanência (minutos) | `90` |
-
-> **Capacidade máxima:** é em número de **pessoas**, não de mesas. Se o restaurante aceita 60 pessoas por turno, coloque `60`. O widget filtra horários onde a soma de `partySize` das reservas confirmadas já atingiu esse limite.
-
-### 4.3 Exemplo de configuração típica
-
-```
-Turno: Almoço
-  Início: 12:00  Fim: 15:00
-  Dias: Segunda a Sábado
-  Capacidade: 60 pessoas
-  Giro: 90 min
-
-Turno: Jantar
-  Início: 19:00  Fim: 23:00
-  Dias: Terça a Domingo
-  Capacidade: 80 pessoas
-  Giro: 120 min
-```
+| Nome | Exibido no widget | `Jantar` |
+| Horário início/fim | Formato HH:MM | `19:00` / `23:00` |
+| Dias da semana | 0=Dom … 6=Sáb | `2,3,4,5,6` |
+| Capacidade máxima | Total de **pessoas** | `80` |
+| Duração do giro | Minutos de permanência média | `120` |
 
 ---
 
 ## 5. Criando o mapa de mesas
 
-O mapa é necessário para que o sistema consiga fazer **atribuição de mesas** e exibir o status em tempo real no painel do operador.
+**Menu lateral → Mesas**
 
-### 5.1 Acessar o editor de mesas
+Use o editor visual para criar e posicionar mesas. Campos por mesa:
 
-No menu lateral, clique em **Mesas**.
+| Campo | Exemplo |
+|---|---|
+| Nome/Número | `Mesa 12` |
+| Capacidade máxima | `4` |
+| Capacidade mínima | `2` |
+| Área | `Salão`, `Varanda`, `Bar` |
+| Forma | `SQUARE`, `ROUND`, `RECTANGLE`, `BOOTH`, `LONG_RECTANGLE` |
 
-### 5.2 Editor visual
-
-O editor permite arrastar e posicionar mesas no canvas. Para cada mesa, defina:
-
-| Campo | Descrição | Exemplo |
-|---|---|---|
-| Nome/Número | Identificador visível | `Mesa 12` |
-| Capacidade | Máximo de pessoas | `4` |
-| Capacidade mínima | Mínimo para ocupar | `2` |
-| Área | Ambiente (salão, varanda, bar) | `Salão` |
-| Forma | `SQUARE`, `ROUND`, `RECTANGLE`, `BOOTH`, `LONG_RECTANGLE` | `ROUND` |
-
-### 5.3 Salvar
-
-Clique em **Salvar mapa**. O sistema sincroniza automaticamente as mesas do canvas com o banco de dados.
-
-> **Mínimo recomendado:** crie pelo menos as mesas reais do restaurante. Isso permite a atribuição automática de mesa no momento da reserva e a gestão visual no painel do operador durante o serviço.
+Clique **Salvar mapa** após editar.
 
 ---
 
 ## 6. Configurando o tema do widget
 
-O widget herda as cores e fontes definidas aqui. Uma configuração cuidadosa faz o widget parecer parte nativa do site do restaurante.
+**Configurações → Tema**
 
-### 6.1 Acessar configuração de tema
-
-**Configurações → Tema**.
-
-### 6.2 Campos disponíveis
-
-| Campo | Descrição | Formato |
+| Campo | Formato | Exemplo |
 |---|---|---|
-| Cor primária | Cor dos botões e destaques | `#HEX` ex: `#C8A96E` |
-| Cor de destaque | Hover e acentos secundários | `#HEX` |
-| Fonte | Família tipográfica | `Figtree`, `Inter`, `Playfair Display`, etc. |
-| Border radius | Arredondamento dos botões | `0.5rem`, `1rem`, `0px` |
-| Logo URL | URL pública da logo | `https://...` |
-| Imagem de capa | URL pública da capa | `https://...` |
+| Cor primária | `#HEX` | `#C8A96E` |
+| Fonte | Nome da família | `Figtree` |
+| Border radius | CSS | `0.75rem` |
+| Logo URL | URL pública | `https://...` |
 
-### 6.3 Recomendações por tipo de restaurante
-
+Exemplos por perfil:
 ```
-Restaurante fine dining:
-  primaryColor: #1a1a1a  (preto elegante)
-  fontFamily: Playfair Display
-  borderRadius: 0.25rem  (botões mais quadrados)
-
-Restaurante casual/brasserie:
-  primaryColor: #C8A96E  (dourado)
-  fontFamily: Figtree
-  borderRadius: 0.75rem
-
-Bar/lounge:
-  primaryColor: #7C3AED  (roxo)
-  fontFamily: Inter
-  borderRadius: 1rem
+Fine dining:  primaryColor: #1a1a1a | fontFamily: Playfair Display | borderRadius: 0.25rem
+Casual:       primaryColor: #C8A96E | fontFamily: Figtree           | borderRadius: 0.75rem
+Bar/Lounge:   primaryColor: #7C3AED | fontFamily: Inter             | borderRadius: 1rem
 ```
 
 ---
 
 ## 7. Configurando notificações WhatsApp
 
-Este é o passo mais importante para a operação funcionar. Sem o WhatsApp configurado, reservas são criadas mas o cliente não recebe nenhuma comunicação.
+### 7.1 Credenciais Z-API
 
-### 7.1 Obter credenciais Z-API
+1. Acesse z-api.io → crie instância → escaneie QR Code com WhatsApp Business
+2. Anote: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`
 
-1. Acesse `https://z-api.io` e crie uma conta
-2. Crie uma instância conectada ao número WhatsApp Business do restaurante
-3. Escaneie o QR Code com o celular do restaurante (app WhatsApp Business)
-4. Anote os valores:
-   - `ZAPI_INSTANCE_ID` — ID da instância (ex: `3D5F2A...`)
-   - `ZAPI_TOKEN` — Token da instância
-   - `ZAPI_CLIENT_TOKEN` — Token do cliente (na dashboard Z-API → API Keys)
+### 7.2 Templates disponíveis
 
-### 7.2 Adicionar as credenciais ao ambiente
+| Gatilho | Quando dispara |
+|---|---|
+| `RESERVATION_CREATED` | Reserva criada |
+| `REMINDER_24H` | 24h antes (cron horário) |
+| `REMINDER_2H` | 2h antes (cron horário) |
+| `PAYMENT_CONFIRMED` | Pix confirmado (webhook) |
+| `WAITLIST_AVAILABLE` | Mesa liberada na fila |
+| `POST_VISIT` | 2–4h após FINISHED |
+| `CANCELLED` | Reserva cancelada |
 
-No arquivo `.env` do projeto TeMesa:
-
-```env
-ZAPI_INSTANCE_ID=SUA_INSTANCE_ID
-ZAPI_TOKEN=SEU_TOKEN
-ZAPI_CLIENT_TOKEN=SEU_CLIENT_TOKEN
-ZAPI_BASE_URL=https://api.z-api.io
+Variáveis disponíveis nos templates:
 ```
-
-Se o projeto está no **Vercel**, adicione essas variáveis em:
-`Settings → Environment Variables → Production`
-
-### 7.3 Verificar templates de notificação
-
-**Configurações → Notificações** exibe todos os templates ativos por gatilho e canal.
-
-Os gatilhos disponíveis e quando são disparados:
-
-| Gatilho | Quando | Canal padrão |
-|---|---|---|
-| `RESERVATION_CREATED` | Reserva criada | WhatsApp + E-mail |
-| `REMINDER_24H` | 24h antes (cron horário) | WhatsApp + E-mail |
-| `REMINDER_2H` | 2h antes (cron horário) | WhatsApp + E-mail |
-| `PAYMENT_CONFIRMED` | Pix confirmado (webhook Pagar.me) | WhatsApp + E-mail |
-| `WAITLIST_AVAILABLE` | Mesa liberada para cliente na lista | WhatsApp + E-mail |
-| `POST_VISIT` | 2–4h após status FINISHED (cron) | WhatsApp + E-mail |
-| `CANCELLED` | Reserva cancelada | WhatsApp + E-mail |
-
-### 7.4 Personalizar um template
-
-Os templates usam variáveis no formato `{{variavel}}`. Variáveis disponíveis:
-
-```
-{{guestName}}       → Nome do cliente
-{{restaurantName}}  → Nome do restaurante
-{{date}}            → Data formatada (dd/MM/yyyy)
-{{time}}            → Horário (HH:mm)
-{{partySize}}       → Número de pessoas
-{{confirmUrl}}      → URL para confirmar presença
-{{cancelUrl}}       → URL para cancelar reserva
-{{reviewUrl}}       → URL de avaliação (aponta para a home por padrão)
-```
-
-Exemplo de template de confirmação customizado:
-
-```
-✅ *Olá {{guestName}}!*
-
-Sua reserva no *{{restaurantName}}* foi confirmada com sucesso.
-
-📅 Data: {{date}}
-⏰ Horário: {{time}}
-👥 Pessoas: {{partySize}}
-
-Confirme sua presença: {{confirmUrl}}
-Precisa cancelar? {{cancelUrl}}
-
-Aguardamos você! 🍽️
+{{guestName}} {{restaurantName}} {{date}} {{time}} {{partySize}}
+{{confirmUrl}} {{cancelUrl}} {{reviewUrl}}
 ```
 
 ---
 
 ## 8. Obtendo a URL e o código de embed
 
-### 8.1 URL direta do widget
-
-A URL do widget segue sempre o padrão:
-
+### 8.1 URL do widget
 ```
-https://temesa.app/r/[SLUG-DO-RESTAURANTE]
+https://seu-app.netlify.app/r/[SLUG]
 ```
 
-Exemplo: se o slug é `restaurante-bela-vista`:
-
-```
-https://temesa.app/r/restaurante-bela-vista
-```
-
-Para confirmar o slug exato, vá em **Configurações → Geral** e verifique o campo "Slug".
-
-### 8.2 Código de embed (iframe)
-
-Para embutir o widget diretamente em uma página do site do restaurante:
-
+### 8.2 Iframe (embed)
 ```html
-<!-- Widget TeMesa — Reservas Online -->
 <div style="width: 100%; max-width: 480px; margin: 0 auto;">
   <iframe
-    src="https://temesa.app/r/SLUG-DO-RESTAURANTE"
+    src="https://seu-app.netlify.app/r/SLUG"
     width="100%"
     height="700"
     frameborder="0"
-    scrolling="auto"
-    allow="clipboard-write"
     style="border: none; border-radius: 12px;"
-    title="Reservas — Nome do Restaurante"
+    title="Reservas online"
   ></iframe>
 </div>
 ```
 
-> Substitua `SLUG-DO-RESTAURANTE` e `Nome do Restaurante` pelos valores reais.
-
-### 8.3 Botão com link externo (mais simples)
-
-Abre o widget em uma nova aba. Indicado para sites simples ou landing pages:
-
+### 8.3 Botão externo
 ```html
 <a
-  href="https://temesa.app/r/SLUG-DO-RESTAURANTE"
+  href="https://seu-app.netlify.app/r/SLUG"
   target="_blank"
   rel="noopener noreferrer"
-  style="
-    display: inline-block;
-    background-color: #COR-PRIMARIA-DO-RESTAURANTE;
-    color: #ffffff;
-    padding: 14px 32px;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    text-decoration: none;
-    letter-spacing: 0.03em;
-  "
+  style="display:inline-block; background:#000; color:#fff;
+         padding:14px 32px; border-radius:8px; font-weight:600;
+         text-decoration:none;"
 >
   Reservar mesa
 </a>
@@ -360,218 +214,107 @@ Abre o widget em uma nova aba. Indicado para sites simples ou landing pages:
 
 ## 9. Adicionando ao site do restaurante
 
-Escolha a abordagem de acordo com a plataforma do site:
+| Plataforma | Método |
+|---|---|
+| WordPress / Elementor | Bloco **HTML personalizado** → cole o iframe |
+| Wix | **Adicionar → Incorporar → Código HTML** → cole o iframe |
+| Squarespace | Bloco **/code** → cole o iframe |
+| Webflow | Componente **Embed** → cole o iframe |
+| HTML puro / Next.js | Cole diretamente na página |
 
-### 9.1 WordPress / Elementor / WPBakery
+Altura recomendada: `700px` desktop, `750px` mobile.
 
-1. Abra a página onde o widget deve aparecer no editor
-2. Adicione um bloco/widget de **HTML personalizado** (Custom HTML)
-3. Cole o código do iframe da seção 8.2
-4. Salve e publique
+---
 
-Para o Elementor especificamente:
-- Arraste o widget **HTML** para a seção desejada
-- Cole o código do iframe no campo de conteúdo
+## 10. Deploy em produção — Netlify
 
-### 9.2 Wix
+### 10.1 Arquivos obrigatórios na raiz do projeto
 
-1. No editor do Wix, clique em **Adicionar → Incorporar → Código HTML**
-2. Cole o código do iframe
-3. Ajuste o tamanho arrastando as alças do bloco (mínimo recomendado: 480 × 700px)
-4. Publique o site
+**`netlify.toml`:**
+```toml
+[build]
+  command   = "pnpm prisma generate && pnpm run build"
+  publish   = ".next"
 
-### 9.3 Squarespace
-
-1. Adicione um bloco de **Código** (`/code` na barra de blocos)
-2. Cole o código do iframe
-3. Clique em **Aplicar**
-
-### 9.4 Webflow
-
-1. Arraste o componente **Embed** para a seção desejada
-2. Cole o código do iframe no editor de embed
-3. Salve e publique
-
-### 9.5 Site HTML puro / Next.js / React
-
-**HTML puro:** cole diretamente no `<body>` da página:
-
-```html
-<section id="reservas" style="padding: 60px 20px;">
-  <h2 style="text-align: center; margin-bottom: 32px;">Faça sua reserva</h2>
-  <div style="width: 100%; max-width: 480px; margin: 0 auto;">
-    <iframe
-      src="https://temesa.app/r/SLUG-DO-RESTAURANTE"
-      width="100%"
-      height="700"
-      frameborder="0"
-      style="border: none; border-radius: 12px;"
-      title="Reservas online"
-    ></iframe>
-  </div>
-</section>
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 ```
 
-**React / Next.js:**
-
-```tsx
-export function SecaoReservas() {
-  return (
-    <section id="reservas" className="py-16 px-4">
-      <h2 className="text-center text-2xl font-bold mb-8">Faça sua reserva</h2>
-      <div className="max-w-[480px] mx-auto">
-        <iframe
-          src="https://temesa.app/r/SLUG-DO-RESTAURANTE"
-          width="100%"
-          height={700}
-          style={{ border: 'none', borderRadius: '12px' }}
-          title="Reservas online"
-        />
-      </div>
-    </section>
-  )
+**`package.json`** — script `postinstall`:**
+```json
+"scripts": {
+  "postinstall": "prisma generate"
 }
 ```
 
+**`prisma/schema.prisma`** — datasource com `directUrl`:**
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+**`tsconfig.json`** — excluir pasta `prisma`:**
+```json
+"exclude": ["node_modules", "prisma"]
+```
+
+**`next.config.js`** — adicionar `turbopack: {}`:**
+```js
+const nextConfig = {
+  turbopack: {},
+  reactStrictMode: true,
+  // ... resto das configs
+}
+```
+
+### 10.2 Deploy inicial — passo a passo
+
+```bash
+# 1. Criar repositório no GitHub e fazer push
+git remote add origin https://github.com/SEU_USER/TeMesa.git
+git branch -M main
+git push -u origin main
+
+# 2. No Netlify: New project → Import from GitHub → selecionar o repo
+#    O Netlify detecta Next.js automaticamente e configura o plugin
+
+# 3. Instalar Netlify CLI (usar npm, não pnpm global)
+npm install -g netlify-cli
+
+# 4. Login e link com o projeto Netlify
+netlify login
+netlify link
+
+# 5. Importar TODAS as variáveis do .env para o Netlify de uma vez
+netlify env:import .env
+
+# 6. Forçar redeploy para embutir variáveis NEXT_PUBLIC_* no bundle
+git commit --allow-empty -m "chore: trigger redeploy with env vars"
+git push
+```
+
+> **Não usar** `netlify deploy --build --prod` no Windows — causa erro EPERM
+> com arquivos `.dll` do Prisma em uso. Sempre fazer deploy via `git push`.
+
+### 10.3 Deploys subsequentes
+
+Todo `git push` para `main` dispara deploy automático.
+
+Variáveis `NEXT_PUBLIC_*` são embutidas no bundle no momento do build. Ao alterar qualquer variável de ambiente, sempre fazer um novo deploy.
+
 ---
 
-## 10. Testando o fluxo completo
-
-Execute este checklist **antes** de divulgar o link para clientes reais.
-
-### 10.1 Checklist de pré-lançamento
-
-```
-□ 1. Abrir https://temesa.app/r/[slug] no browser
-□ 2. Verificar que o nome e logo do restaurante aparecem corretamente
-□ 3. Selecionar 2 pessoas e a data de hoje — botão "Ver horários" deve aparecer
-□ 4. Confirmar que os turnos criados aparecem como opções de horário
-□ 5. Selecionar um horário e preencher o formulário com dados de teste:
-       Nome: Teste TeMesa
-       WhatsApp: +55 [seu número]
-       E-mail: [seu e-mail]
-       Aceitar o checkbox LGPD
-□ 6. Clicar "Confirmar reserva" — a tela de sucesso deve aparecer
-□ 7. Verificar que a mensagem de confirmação chegou no WhatsApp
-□ 8. Acessar o painel TeMesa → Reservas e confirmar que a reserva aparece
-□ 9. No painel, clicar na reserva e tentar avançar o status para CHECKED_IN
-□ 10. Abrir o link de cancelamento enviado no WhatsApp e testar o cancelamento
-□ 11. Confirmar que a mensagem de cancelamento chegou no WhatsApp
-```
-
-### 10.2 Teste do iframe no site
-
-```
-□ 1. Abrir a página do site onde o iframe foi inserido
-□ 2. Verificar que o widget carrega sem barra de scroll horizontal
-□ 3. Testar no mobile (320px a 390px de largura)
-□ 4. Verificar que o iframe não corta nenhuma parte do formulário
-     (se cortar, aumentar o atributo height="..." no código do iframe)
-□ 5. Verificar que o botão "Reservar mesa" (se usado) abre a URL correta
-```
-
-### 10.3 Ajuste de altura do iframe
-
-O widget tem altura variável conforme o passo. Valores recomendados:
-
-| Situação | height recomendado |
-|---|---|
-| Desktop | `700` |
-| Mobile (via CSS responsive) | `750` |
-| Apenas botão externo | N/A |
-
-Para responsividade automática, use este snippet com JavaScript:
-
-```html
-<iframe
-  id="temesa-widget"
-  src="https://temesa.app/r/SLUG"
-  width="100%"
-  height="700"
-  frameborder="0"
-  style="border: none; border-radius: 12px; min-height: 600px;"
-></iframe>
-```
-
----
-
-## 11. Configurações opcionais
-
-### 11.1 Pagamento antecipado (sinal via Pix)
-
-> **Esta funcionalidade está DESATIVADA por padrão.** Ative apenas se o restaurante quiser cobrar um sinal para confirmar a reserva.
-
-Para ativar: **Configurações → Pagamento**
-
-Campos de configuração:
-
-```
-prepayment_type:
-  POR_PESSOA   → cobra X reais por cada pessoa do grupo
-  VALOR_FIXO   → cobra um valor fixo por reserva
-  PERCENTUAL   → cobra % do valor estimado
-
-prepayment_amount:
-  Valor em reais (ex: 50.00 → R$ 50 por pessoa)
-
-prepayment_applies_to:
-  TODAS_RESERVAS     → sempre cobra
-  FERIADOS           → apenas em feriados
-  FINAIS_DE_SEMANA   → sábado e domingo
-  MANUAL             → operador decide caso a caso
-
-no_show_policy:
-  COBRAR_TOTAL    → retém o valor integral em caso de no-show
-  COBRAR_PARCIAL  → retém parte
-  REEMBOLSAR      → devolve tudo
-  CREDITO         → vira crédito para próxima visita
-
-cancellation_deadline_hours:
-  Horas antes da reserva que o cliente pode cancelar sem cobrança
-  Ex: 24 → pode cancelar até 24h antes sem perder o sinal
-```
-
-Quando o pagamento antecipado está ativo, o fluxo do widget inclui automaticamente uma etapa de Pix antes de confirmar a reserva. O cliente recebe o QR Code e o sistema aguarda o webhook do Pagar.me para confirmar.
-
-**Requisito adicional para pagamento:** configurar as credenciais do Pagar.me no `.env`:
+## 11. Variáveis de ambiente — referência completa
 
 ```env
-PAGARME_API_KEY=ak_live_...
-PAGARME_WEBHOOK_SECRET=seu_secret_hmac
-```
-
-### 11.2 Lista de espera (waitlist)
-
-Quando um turno está lotado, o widget pode adicionar o cliente a uma fila de espera. O sistema envia notificação automática via WhatsApp quando uma mesa abrir.
-
-A waitlist é ativada automaticamente quando `maxCapacity` do turno é atingida. Não há configuração adicional.
-
-### 11.3 Domínio personalizado
-
-Para que o widget apareça em `reservas.meurestaurante.com.br` ao invés de `temesa.app/r/slug`, configure um subdomínio no Vercel:
-
-1. No painel Vercel do projeto TeMesa → **Settings → Domains**
-2. Adicione o domínio `reservas.meurestaurante.com.br`
-3. No DNS do domínio do restaurante, adicione um registro CNAME:
-   ```
-   reservas  CNAME  cname.vercel-dns.com
-   ```
-4. Aguarde a propagação (até 48h)
-
-Após configurar, o widget fica acessível em `https://reservas.meurestaurante.com.br/r/slug`.
-
----
-
-## 12. Referência de variáveis de ambiente
-
-Todas as variáveis abaixo devem ser configuradas no arquivo `.env` (local) e no painel **Settings → Environment Variables** do Vercel (produção).
-
-```env
-# ── APLICAÇÃO ─────────────────────────────────────────────────────────────────
-NEXT_PUBLIC_APP_URL=https://temesa.app
-# URL base usada nos links de confirmação/cancelamento enviados por WhatsApp.
-# Em produção: https://temesa.app (ou o domínio customizado)
-# Em desenvolvimento: http://localhost:3000
+# ── APLICAÇÃO ──────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_APP_URL=https://seu-app.netlify.app
+# NUNCA deixar como http://localhost:3000 em produção.
+# Usada em todos os links enviados por WhatsApp (confirmação, cancelamento).
+# Copiar a URL gerada pelo Netlify após o primeiro deploy.
 
 # ── AUTENTICAÇÃO (Clerk) ──────────────────────────────────────────────────────
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
@@ -582,125 +325,191 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard/reservas
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding
 
 # ── BANCO DE DADOS (Supabase) ─────────────────────────────────────────────────
-DATABASE_URL=postgresql://postgres:[SENHA]@aws-1-us-east-2.pooler.supabase.com:6543/postgres
-# URL com pooler (porta 6543) — usada pela aplicação em runtime
+DATABASE_URL=postgresql://postgres.XXXX:SENHA@aws-1-us-east-2.pooler.supabase.com:6543/postgres
+# Transaction pooler — porta 6543 — usado pela aplicação em runtime
 
-DIRECT_URL=postgresql://postgres:[SENHA]@db.[PROJECT-REF].supabase.co:5432/postgres
-# URL direta (porta 5432) — usada pelo Prisma para migrations/db push
-# OBRIGATÓRIA para que `pnpm prisma db push` funcione sem travar
+DIRECT_URL=postgresql://postgres:SENHA@db.XXXX.supabase.co:5432/postgres
+# Direct connection — porta 5432 — usado pelo Prisma para DDL/migrations
+# Supabase → Settings → Database → Direct connection
+# OBRIGATÓRIO: sem isso, prisma db push trava indefinidamente
+
+NEXT_PUBLIC_SUPABASE_URL=https://XXXX.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 # ── WHATSAPP (Z-API) ──────────────────────────────────────────────────────────
 ZAPI_INSTANCE_ID=sua_instance_id
 ZAPI_TOKEN=seu_token
 ZAPI_CLIENT_TOKEN=seu_client_token
 ZAPI_BASE_URL=https://api.z-api.io
+# Sem configuração: sistema funciona, mensagens não são enviadas.
 
 # ── E-MAIL (Resend) ───────────────────────────────────────────────────────────
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@temesa.app
-# O domínio do from precisa estar verificado no Resend
+# Domínio precisa estar verificado no Resend.
+
+# ── SEGURANÇA ─────────────────────────────────────────────────────────────────
+ENCRYPTION_KEY=32characterslongexactlyrequired!
+# Exatamente 32 caracteres.
+# Gerar: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+
+CRON_SECRET=qualquer_string_longa_e_aleatoria
+# Protege /api/cron/*. Usar o mesmo valor no cron-job.org como Bearer token.
 
 # ── PAGAMENTOS (Pagar.me) — opcional ─────────────────────────────────────────
 PAGARME_API_KEY=ak_live_...
-PAGARME_WEBHOOK_SECRET=secret_para_validacao_hmac
-# Necessário apenas se o módulo de pagamento antecipado estiver ativo
+PAGARME_WEBHOOK_SECRET=secret_hmac
 
-# ── SEGURANÇA ─────────────────────────────────────────────────────────────────
-ENCRYPTION_KEY=chave_de_32_caracteres_exatos_aqui
-# Usada para criptografar API keys de integrações no banco de dados
-# Gerar com: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
-
-CRON_SECRET=outra_chave_longa_aleatoria
-# Protege as rotas /api/cron/* de chamadas não autorizadas
-# O Vercel envia este token automaticamente nos headers dos cron jobs
-# Configurar também em: vercel.json → env (ou como variável de ambiente no Vercel)
+# ── BC CONNECT — opcional ────────────────────────────────────────────────────
+BC_CONNECT_WEBHOOK_URL=https://bc-conect.fly.dev
+BC_CONNECT_ADMIN_API_KEY=sua_chave
 ```
 
 ---
 
-## 13. Troubleshooting
+## 12. Banco de dados — setup inicial
 
-### Widget mostra "Sem disponibilidade" para todas as datas
+### 12.1 Criar tabelas (fazer apenas uma vez)
 
-**Causa mais provável:** nenhum turno ativo cadastrado, ou os turnos não incluem o dia da semana selecionado.
+**Opção A — Via Supabase SQL Editor (recomendado):**
+1. supabase.com → seu projeto → **SQL Editor → New query**
+2. Cole o conteúdo de `supabase-schema.sql` (na raiz do projeto)
+3. Clique **Run**
 
-**Solução:**
-1. Acessar **Configurações → Turnos**
-2. Verificar se existe ao menos um turno com `isActive = true`
-3. Verificar se os dias da semana do turno incluem a data selecionada no widget
-4. Verificar se `maxCapacity` é maior que zero
-
----
-
-### WhatsApp não está enviando mensagens
-
-**Causa mais provável:** credenciais Z-API não configuradas ou instância desconectada.
-
-**Como diagnosticar:**
-1. Verificar as variáveis de ambiente `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN` e `ZAPI_CLIENT_TOKEN`
-2. No painel Z-API, verificar se a instância está no status **Conectada** (ícone verde)
-3. Se a instância estiver desconectada, escanear o QR Code novamente com o WhatsApp Business
-
-**Verificar nos logs do Vercel:**
-- `[Z-API] Não configurado — mensagem não enviada` → variáveis de ambiente ausentes
-- `[Z-API] Falha: ...` → credenciais incorretas ou instância offline
-- `[Notifications] WhatsApp falhou: ...` → erro genérico com detalhes na mensagem
-
----
-
-### `pnpm prisma db push` trava e não termina
-
-**Causa:** o `DATABASE_URL` aponta para a URL do pooler (porta 6543), que não suporta DDL.
-
-**Solução:** confirmar que `DIRECT_URL` está configurado no `.env` e que o `schema.prisma` contém:
-
-```prisma
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")   ← esta linha é obrigatória
-}
+**Opção B — Via terminal (requer DIRECT_URL no .env):**
+```bash
+pnpm prisma db push
 ```
 
-Alternativamente, executar o SQL diretamente no **Supabase SQL Editor**.
+> Se o comando travar após 1 minuto, use a Opção A. O problema é o pooler.
 
----
+### 12.2 Tabelas criadas
 
-### O iframe está cortando o conteúdo
-
-**Causa:** o atributo `height` do iframe é menor que a altura do widget.
-
-**Solução:** aumentar o valor:
-
-```html
-height="800"  <!-- ou 850 para segurança em mobile -->
+O schema inclui todas as tabelas do sistema mais:
+```sql
+-- Rate limiting para o widget público (serverless-safe)
+CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+  key       TEXT        PRIMARY KEY,
+  count     INTEGER     NOT NULL DEFAULT 1,
+  "resetAt" TIMESTAMPTZ NOT NULL
+);
 ```
 
 ---
 
-### Erro 403 ao criar reserva pelo widget
+## 13. Crons externos — cron-job.org
 
-**Causa:** o endpoint de criação de reservas tem rate limiting. O limite padrão é 10 reservas por minuto por slug de restaurante.
+O Netlify free não suporta crons com frequência maior que 1x/dia. Configure no **cron-job.org** (gratuito).
 
-**Contexto:** este limite existe para proteger o widget de abuso. Em condições normais de uso, nunca é atingido.
+**Job 1 — Expirar reservas com pagamento pendente:**
+```
+URL:        https://seu-app.netlify.app/api/cron/expire-pending
+Método:     GET
+Frequência: A cada 5 minutos
+Header:     Authorization: Bearer SEU_CRON_SECRET
+```
 
-**Para testes:** aguardar 60 segundos e tentar novamente.
+**Job 2 — Enviar lembretes (24h e 2h antes):**
+```
+URL:        https://seu-app.netlify.app/api/cron/reminders
+Método:     GET
+Frequência: A cada hora (minuto 0)
+Header:     Authorization: Bearer SEU_CRON_SECRET
+```
 
 ---
 
-### Reserva criada mas não aparece no painel
+## 14. Testando o fluxo completo
 
-**Causa possível:** o painel está filtrado por data específica e a reserva está em outra data.
-
-**Solução:** remover o filtro de data no painel (clique no X do filtro de data para ver todas as reservas).
+```
+□ 1. Abrir https://seu-app.netlify.app/r/[slug]
+□ 2. Nome e logo do restaurante aparecem corretamente
+□ 3. Selecionar 2 pessoas + data de hoje → botão "Ver horários"
+□ 4. Turnos criados aparecem como opções de horário
+□ 5. Selecionar horário → preencher formulário:
+       Nome: Teste TeMesa
+       WhatsApp: +55 [seu número]
+       E-mail: [seu e-mail]
+       Aceitar checkbox LGPD
+□ 6. Clicar "Confirmar reserva" → tela de sucesso aparece
+□ 7. Mensagem WhatsApp de confirmação chegou no número informado
+□ 8. Painel /dashboard/reservas → reserva aparece na lista
+□ 9. Painel → clicar na reserva → avançar status para CHECKED_IN
+□ 10. Clicar no link de cancelamento enviado pelo WhatsApp → cancela
+□ 11. Mensagem WhatsApp de cancelamento chegou
+```
 
 ---
 
-### Erro "Token expirado" ao confirmar ou cancelar pelo link
+## 15. Configurações opcionais
 
-**Causa:** o token de confirmação expira 1 hora antes do horário da reserva. Após esse prazo, o link não funciona mais.
+### 15.1 Pagamento antecipado (sinal Pix)
 
-**Para o operador:** confirmar ou cancelar manualmente pelo painel em **Reservas → [reserva] → Alterar status**.
+Desativado por padrão. Ativar em **Configurações → Pagamento**.
+
+| Campo | Opções |
+|---|---|
+| `prepayment_type` | `POR_PESSOA` / `VALOR_FIXO` / `PERCENTUAL` |
+| `prepayment_applies_to` | `TODAS_RESERVAS` / `FERIADOS` / `FINAIS_DE_SEMANA` / `MANUAL` |
+| `no_show_policy` | `COBRAR_TOTAL` / `COBRAR_PARCIAL` / `REEMBOLSAR` / `CREDITO` |
+| `cancellation_deadline_hours` | Horas antes para cancelar sem cobrança |
+
+Requer `PAGARME_API_KEY` e `PAGARME_WEBHOOK_SECRET`.
+
+### 15.2 Domínio personalizado no Netlify
+
+1. Netlify → **Domain management → Add domain**
+2. DNS do domínio: `reservas CNAME seu-app.netlify.app`
+3. Atualizar `NEXT_PUBLIC_APP_URL` e fazer redeploy
+
+---
+
+## 16. Troubleshooting — erros conhecidos
+
+### `@clerk/nextjs: Missing publishableKey`
+Variável `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` não foi embutida no bundle.
+**Solução:** `netlify env:import .env` → novo deploy via `git push`.
+
+### Build: `Cannot find module '@radix-ui/react-label'`
+`field.tsx` importa pacote individual não instalado.
+**Solução:** substituir `React.ComponentProps<typeof LabelPrimitive.Root>` por `React.ComponentProps<typeof Label>` e remover o import de `@radix-ui/react-label`.
+
+### Build: `Type error — partySize: unknown`
+Zod v4: `z.coerce.number()` infere input como `unknown`.
+**Solução:** usar `z.number()` + `parseInt(e.target.value, 10)` no `onChange`.
+
+### Build: `Resolver — undefined not assignable`
+Zod v4: `.default()` no schema torna o campo opcional no input.
+**Solução:** remover `.default()` do schema, colocar o valor no `defaultValues` do `useForm`.
+
+### Build: `Property 'address' is missing`
+Form de onboarding não envia `address`.
+**Solução:** `createRestaurant.mutate({ ...v, address: {} })`.
+
+### Build: `turbopack webpack conflict`
+`next-pwa` injeta webpack config no Next.js 16 (Turbopack padrão).
+**Solução:** adicionar `turbopack: {}` ao `next.config.js`.
+
+### Build: `PrismaClient not exported`
+Prisma Client não gerado. `prisma/seed.ts` incluído no type-check.
+**Solução:** `"postinstall": "prisma generate"` no `package.json` + excluir `"prisma"` do `tsconfig.json` + `pnpm prisma generate &&` no `netlify.toml`.
+
+### Deploy: `publish directory same as base directory`
+`netlify.toml` sem `publish = ".next"`.
+**Solução:** adicionar `publish = ".next"` ao `[build]`.
+
+### `prisma db push` trava
+Pooler (porta 6543) não aceita DDL.
+**Solução:** usar SQL Editor do Supabase, ou garantir `directUrl = env("DIRECT_URL")` no schema e `DIRECT_URL` (porta 5432) no `.env`.
+
+### Build local: `EPERM: operation not permitted` no Windows
+`netlify deploy --build --prod` conflita com arquivos `.dll` do Prisma em uso.
+**Solução:** nunca buildar localmente via CLI. Sempre fazer deploy via `git push`.
+
+### Widget: "Sem disponibilidade" para todas as datas
+Sem turno ativo ou turno não inclui o dia selecionado.
+**Solução:** Configurações → Turnos → verificar `isActive`, dias da semana e `maxCapacity > 0`.
 
 ---
 
@@ -708,12 +517,15 @@ height="800"  <!-- ou 850 para segurança em mobile -->
 
 | Recurso | URL |
 |---|---|
-| Widget de reservas | `https://temesa.app/r/[slug]` |
-| Painel do operador | `https://temesa.app/dashboard/reservas` |
-| Confirmação pelo cliente | `https://temesa.app/confirmar/[token]` |
-| Cancelamento pelo cliente | `https://temesa.app/confirmar/[token]?action=cancel` |
-| Onboarding (novo restaurante) | `https://temesa.app/onboarding` |
+| Widget de reservas | `https://seu-app.netlify.app/r/[slug]` |
+| Painel do operador | `https://seu-app.netlify.app/dashboard/reservas` |
+| Confirmação pelo cliente | `https://seu-app.netlify.app/confirmar/[token]` |
+| Cancelamento pelo cliente | `https://seu-app.netlify.app/confirmar/[token]?action=cancel` |
+| Onboarding novo restaurante | `https://seu-app.netlify.app/onboarding` |
+| Cron — expirar reservas | `https://seu-app.netlify.app/api/cron/expire-pending` |
+| Cron — lembretes | `https://seu-app.netlify.app/api/cron/reminders` |
 
 ---
 
-*Documento gerado com base no código-fonte do TeMesa. Versão de referência: abril de 2026.*
+*Documento validado em produção — abril 2026.*
+*Sistema em funcionamento em `unique-sfogliatella-a00c01.netlify.app`.*
