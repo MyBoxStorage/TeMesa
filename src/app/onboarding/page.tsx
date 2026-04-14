@@ -115,7 +115,7 @@ export default function OnboardingPage() {
           {/* Step content */}
           {step === 0 && (
             <Form {...form0}>
-              <form onSubmit={form0.handleSubmit(v => createRestaurant.mutate(v))} className="space-y-4">
+              <form onSubmit={form0.handleSubmit(v => createRestaurant.mutate({ ...v, address: {} }))} className="space-y-4">
                 <FormField control={form0.control} name="name" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[12px]">Nome do restaurante *</FormLabel>
