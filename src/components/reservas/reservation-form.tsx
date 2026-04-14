@@ -22,7 +22,7 @@ const schema = z.object({
   guestName:    z.string().min(2, 'Nome obrigatório'),
   guestPhone:   z.string().min(10, 'Telefone inválido'),
   guestEmail:   z.string().email('E-mail inválido').optional().or(z.literal('')),
-  partySize:    z.coerce.number().int().min(1).max(50),
+  partySize:    z.number().int().min(1).max(50),
   date:         z.string().min(1, 'Data obrigatória'),
   time:         z.string().min(1, 'Horário obrigatório'),
   occasion:     z.string().optional(),
@@ -139,7 +139,14 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
               <FormField control={form.control} name="partySize" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[12px]">Pessoas *</FormLabel>
-                  <FormControl><Input type="number" min={1} max={50} {...field} className="h-9 text-[12px]" /></FormControl>
+                  <FormControl>
+                    <Input
+                      type="number" min={1} max={50}
+                      value={field.value}
+                      onChange={e => field.onChange(parseInt(e.target.value, 10) || 1)}
+                      className="h-9 text-[12px]"
+                    />
+                  </FormControl>
                   <FormMessage className="text-[11px]" />
                 </FormItem>
               )} />
