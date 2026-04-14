@@ -20,6 +20,9 @@ importers:
       '@hugeicons/react':
         specifier: ^1.1.6
         version: 1.1.6(react@19.2.4)
+      '@netlify/plugin-nextjs':
+        specifier: ^5.15.9
+        version: 5.15.9
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
@@ -1313,6 +1316,10 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@netlify/plugin-nextjs@5.15.9':
+    resolution: {integrity: sha512-4kJvV+wrt4/ncehfaOXfhv1FYKCv9EFjq6/tgXXYSlqPDcbsuTXR0DTz9IvyZ/CpPRadRD/zzIqD9wXgCmA2lg==}
+    engines: {node: '>=18.0.0'}
 
   '@next/env@16.2.3':
     resolution: {integrity: sha512-ZWXyj4uNu4GCWQw9cjRxWlbD+33mcDszIo9iQxFnBX3Wmgq9ulaSJcl6VhuWx5pCWqqD+9W6Wfz7N0lM5lYPMA==}
@@ -7314,6 +7321,8 @@ snapshots:
       '@emnapi/runtime': 1.9.2
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@netlify/plugin-nextjs@5.15.9': {}
 
   '@next/env@16.2.3': {}
 

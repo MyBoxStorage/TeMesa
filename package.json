@@ -19,6 +19,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
+    "@netlify/plugin-nextjs": "^5.15.9",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.103.0",
