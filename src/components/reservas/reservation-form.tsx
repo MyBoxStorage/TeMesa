@@ -28,8 +28,8 @@ const schema = z.object({
   occasion:     z.string().optional(),
   dietaryNotes: z.string().optional(),
   notes:        z.string().optional(),
-  source:       z.enum(['MANUAL','PHONE','WHATSAPP']).default('MANUAL'),
-  lgpdConsent:  z.boolean().default(false),
+  source:       z.enum(['MANUAL','PHONE','WHATSAPP']),
+  lgpdConsent:  z.boolean(),
 })
 
 type FormValues = z.infer<typeof schema>
