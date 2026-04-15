@@ -65,9 +65,12 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
 
   const onSubmit = (values: FormValues) => {
     const dateTime = new Date(`${values.date}T${values.time}:00`)
-    // Normalize phone to E.164
-    const phone = values.guestPhone.replace(/\D/g, '')
-    const e164 = phone.startsWith('55') ? `+${phone}` : `+55${phone}`
+    const normalizeToE164 = (raw: string): string => {
+      const digits = raw.replace(/\D/g, '')
+      if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
+      return `+55${digits}`
+    }
+    const e164 = normalizeToE164(values.guestPhone)
 
     create.mutate({
       restaurantId,

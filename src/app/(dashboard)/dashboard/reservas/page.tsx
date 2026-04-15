@@ -38,7 +38,7 @@ export default function ReservasPage() {
     date: dateStr,
     status: statusFilter !== 'all' ? (statusFilter as any) : undefined,
     search: search || undefined,
-  }, { enabled: !!restaurantId })
+  }, { enabled: !!restaurantId, retry: false })
 
   const filtered = reservations ?? []
 

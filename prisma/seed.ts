@@ -1,113 +1,118 @@
+/**
+ * prisma/seed.ts
+ * Cria (ou atualiza) o restaurante Porto Cabral BC com turnos prontos.
+ * Execução: pnpm tsx prisma/seed.ts
+ */
 import { PrismaClient } from '@prisma/client'
-
-const DEFAULT_TEMPLATES = {
-  RESERVATION_CREATED: {
-    WHATSAPP:
-      '✅ *Reserva confirmada!*\nOlá {{guestName}}, sua reserva no *{{restaurantName}}* está confirmada.\n\n📅 {{date}} às {{time}}\n👥 {{partySize}} pessoas\n\nConfirme sua presença até 1 hora antes: {{confirmUrl}}\nPrecisa cancelar? {{cancelUrl}}\n\nAté lá! 🍽️',
-    EMAIL:
-      'Reserva confirmada!\n\nOlá {{guestName}}, sua reserva no {{restaurantName}} está confirmada.\n\nData: {{date}} {{time}}\nPessoas: {{partySize}}\nConfirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
-  },
-  REMINDER_24H: {
-    WHATSAPP:
-      '⏰ *Lembrete de reserva*\nOlá {{guestName}}! Sua reserva no *{{restaurantName}}* é amanhã.\n\n📅 {{date}} às {{time}} • {{partySize}} pessoas\n\nConfirme: {{confirmUrl}} | Cancelar: {{cancelUrl}}',
-    EMAIL:
-      'Lembrete de reserva (24h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é amanhã.\n\nData: {{date}} {{time}}\nPessoas: {{partySize}}\nConfirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
-  },
-  REMINDER_2H: {
-    WHATSAPP:
-      '🍽️ Olá {{guestName}}! Sua reserva no *{{restaurantName}}* é em 2 horas ({{time}}). Até logo! 😊',
-    EMAIL:
-      'Lembrete de reserva (2h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é em 2 horas.\nHorário: {{time}}\n',
-  },
-  PAYMENT_CONFIRMED: {
-    WHATSAPP:
-      '💳 *Pagamento confirmado!*\nOlá {{guestName}}, seu sinal para *{{restaurantName}}* foi recebido.\n📅 {{date}} às {{time}} • Obrigado! 🎉',
-    EMAIL:
-      'Pagamento confirmado\n\nOlá {{guestName}}, seu sinal para {{restaurantName}} foi recebido.\nData: {{date}} {{time}}\n',
-  },
-  WAITLIST_AVAILABLE: {
-    WHATSAPP:
-      '🎉 *Mesa disponível no {{restaurantName}}!*\nOlá {{guestName}}, uma mesa ficou disponível!\n\nVocê tem *15 minutos* para confirmar: {{confirmUrl}}\nNão quer mais? {{cancelUrl}}',
-    EMAIL:
-      'Mesa disponível!\n\nOlá {{guestName}}, uma mesa ficou disponível no {{restaurantName}}.\nConfirmar (15 min): {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
-  },
-  POST_VISIT: {
-    WHATSAPP:
-      '🙏 Olá {{guestName}}, obrigado pela visita ao *{{restaurantName}}*! Como foi sua experiência?\n⭐ {{reviewUrl}}',
-    EMAIL:
-      'Obrigado pela visita!\n\nOlá {{guestName}}, obrigado pela visita ao {{restaurantName}}.\nAvaliar: {{reviewUrl}}\n',
-  },
-  CANCELLED: {
-    WHATSAPP:
-      '❌ Olá {{guestName}}, sua reserva no *{{restaurantName}}* de {{date}} às {{time}} foi cancelada. Até a próxima! 👋',
-    EMAIL:
-      'Reserva cancelada\n\nOlá {{guestName}}, sua reserva no {{restaurantName}} de {{date}} às {{time}} foi cancelada.\n',
-  },
-} as const
 
 const prisma = new PrismaClient()
 
 async function main() {
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@demo.temesa.app' },
-    update: {},
-    create: {
-      clerkId: 'clerk_demo_admin',
-      email: 'admin@demo.temesa.app',
-      name: 'Admin Demo',
-      phone: '+5511999999999',
-    },
-  })
+  console.log('🌱 Iniciando seed do Porto Cabral BC...')
 
+  // ── 1. Restaurante ────────────────────────────────────────────────────────
   const restaurant = await prisma.restaurant.upsert({
-    where: { slug: 'demo' },
-    update: {},
-    create: {
-      name: 'Restaurante Demo',
-      slug: 'demo',
-      phone: '+5547999999999',
-      address: { city: 'Balneário Camboriú', state: 'SC', country: 'BR' },
+    where: { slug: 'porto-cabral-bc' },
+    update: {
+      name: 'Porto Cabral BC',
+      phone: '+554733660000',
+      themeConfig: {
+        primaryColor: '#C8A96E',
+        accentColor:  '#C8A96E',
+        fontFamily:   'Playfair Display',
+        borderRadius: '0.75rem',
+      },
       operatingHours: {
-        monday: { open: '12:00', close: '23:00', enabled: true },
-        tuesday: { open: '12:00', close: '23:00', enabled: true },
-        wednesday: { open: '12:00', close: '23:00', enabled: true },
-        thursday: { open: '12:00', close: '23:00', enabled: true },
-        friday: { open: '12:00', close: '23:00', enabled: true },
-        saturday: { open: '12:00', close: '23:00', enabled: true },
-        sunday: { open: '12:00', close: '23:00', enabled: true },
+        mon: { open: '12:00', close: '23:00' },
+        tue: { open: '12:00', close: '23:00' },
+        wed: { open: '12:00', close: '23:00' },
+        thu: { open: '12:00', close: '23:00' },
+        fri: { open: '12:00', close: '00:00' },
+        sat: { open: '12:00', close: '00:00' },
+        sun: { open: '12:00', close: '23:00' },
       },
     },
-  })
-
-  await prisma.userRestaurant.upsert({
-    where: { userId_restaurantId: { userId: admin.id, restaurantId: restaurant.id } },
-    update: { role: 'OWNER' },
-    create: { userId: admin.id, restaurantId: restaurant.id, role: 'OWNER' },
-  })
-
-  const templateRows = Object.entries(DEFAULT_TEMPLATES).flatMap(([trigger, channels]) => {
-    return Object.entries(channels).map(([channel, templatePtBr]) => ({
-      restaurantId: restaurant.id,
-      trigger: trigger as any,
-      channel: channel as any,
-      templatePtBr,
+    create: {
+      name:    'Porto Cabral BC',
+      slug:    'porto-cabral-bc',
+      phone:   '+554733660000',
+      address: {
+        street:  'Av. Atlântica',
+        city:    'Balneário Camboriú',
+        state:   'SC',
+        zip:     '88330-000',
+        country: 'BR',
+      },
+      timezone: 'America/Sao_Paulo',
+      themeConfig: {
+        primaryColor: '#C8A96E',
+        accentColor:  '#C8A96E',
+        fontFamily:   'Playfair Display',
+        borderRadius: '0.75rem',
+      },
+      operatingHours: {
+        mon: { open: '12:00', close: '23:00' },
+        tue: { open: '12:00', close: '23:00' },
+        wed: { open: '12:00', close: '23:00' },
+        thu: { open: '12:00', close: '23:00' },
+        fri: { open: '12:00', close: '00:00' },
+        sat: { open: '12:00', close: '00:00' },
+        sun: { open: '12:00', close: '23:00' },
+      },
       isActive: true,
-    }))
+    },
   })
+  console.log(`✅ Restaurante: ${restaurant.name} (id: ${restaurant.id})`)
 
-  await prisma.notificationTemplate.createMany({
-    data: templateRows,
-    skipDuplicates: true,
-  })
+  // ── 2. Turnos ─────────────────────────────────────────────────────────────
+  const shiftsData = [
+    {
+      name:         'Almoço',
+      startTime:    '12:00',
+      endTime:      '15:30',
+      daysOfWeek:   [0, 1, 2, 3, 4, 5, 6],
+      maxCapacity:  120,
+      turnDuration: 90,
+    },
+    {
+      name:         'Happy Hour',
+      startTime:    '17:00',
+      endTime:      '19:00',
+      daysOfWeek:   [4, 5, 6],
+      maxCapacity:  60,
+      turnDuration: 60,
+    },
+    {
+      name:         'Jantar',
+      startTime:    '19:00',
+      endTime:      '23:00',
+      daysOfWeek:   [0, 1, 2, 3, 4, 5, 6],
+      maxCapacity:  120,
+      turnDuration: 120,
+    },
+  ]
+
+  for (const s of shiftsData) {
+    const existing = await prisma.shift.findFirst({
+      where: { restaurantId: restaurant.id, name: s.name },
+    })
+    if (existing) {
+      await prisma.shift.update({ where: { id: existing.id }, data: { ...s, isActive: true } })
+      console.log(`  ↻ Turno atualizado: ${s.name}`)
+    } else {
+      await prisma.shift.create({ data: { restaurantId: restaurant.id, ...s, isActive: true } })
+      console.log(`  ✚ Turno criado: ${s.name}`)
+    }
+  }
+
+  console.log('')
+  console.log('──────────────────────────────────────────')
+  console.log('🎉 Seed concluído!')
+  console.log(`   Restaurante ID : ${restaurant.id}`)
+  console.log(`   Widget URL     : https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc`)
+  console.log('──────────────────────────────────────────')
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect()
-  })
-  .catch(async (e) => {
-    console.error(e)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
-
+  .catch((e) => { console.error('❌ Erro no seed:', e); process.exit(1) })
+  .finally(() => prisma.$disconnect())

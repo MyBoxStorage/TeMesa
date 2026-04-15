@@ -1,11 +1,19 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
+import type { ReservationSource, ReservationStatus } from '@prisma/client'
 
 import { sendNotification } from '@/lib/notifications'
 import { sendBcEvent } from '@/lib/bcconnect'
 import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, reliabilityScore } from '@/lib/reservationRules'
-import { hostessProcedure, protectedProcedure, staffProcedure, publicProcedure, router } from '@/server/trpc'
+import {
+  type AuthedRestaurantCtx,
+  hostessProcedure,
+  protectedProcedure,
+  publicProcedure,
+  router,
+  staffProcedure,
+} from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)
 
@@ -43,7 +51,7 @@ async function createReservationCore(params: {
         tableId: input.tableId,
         shiftId: input.shiftId,
         date: { gte: start, lte: end },
-        status: { in: ACTIVE_RESERVATION_STATUSES as any },
+        status: { in: ACTIVE_RESERVATION_STATUSES },
       },
       select: { id: true },
     })
@@ -56,9 +64,14 @@ async function createReservationCore(params: {
   })
   if (!restaurant) throw new TRPCError({ code: 'NOT_FOUND', message: 'Restaurante não encontrado' })
 
+  const prepaymentActive =
+    restaurant.prepaymentConfig != null &&
+    typeof restaurant.prepaymentConfig === 'object' &&
+    (restaurant.prepaymentConfig as Record<string, unknown>).prepayment_enabled === true
+  const initialStatus: ReservationStatus = prepaymentActive ? 'PENDING_PAYMENT' : 'CONFIRMED'
+
   const token = nanoid(32)
   const expiresAt = confirmTokenExpiresAt(input.date)
-  const initialStatus = restaurant.prepaymentConfig ? 'PENDING_PAYMENT' : 'CONFIRMED'
 
   const customer = await ctx.prisma.customer.upsert({
     where: { restaurantId_phone: { restaurantId: input.restaurantId, phone: input.guestPhone } },
@@ -94,17 +107,17 @@ async function createReservationCore(params: {
       guestEmail: input.guestEmail,
       partySize: input.partySize,
       date: input.date,
-      status: initialStatus as any,
+      status: initialStatus,
       occasion: input.occasion,
       notes: input.notes,
       dietaryNotes: input.dietaryNotes,
-      source: input.source as any,
+      source: input.source as ReservationSource,
       confirmToken: token,
       confirmTokenExpiresAt: expiresAt,
       lgpdConsent: input.lgpdConsent,
       lgpdConsentAt: input.lgpdConsent ? new Date() : null,
       statusHistory: {
-        create: { fromStatus: null, toStatus: initialStatus as any, changedBy: 'SYSTEM' },
+        create: { fromStatus: null, toStatus: initialStatus, changedBy: 'SYSTEM' },
       },
     },
     include: { restaurant: true, customer: true },
@@ -216,12 +229,12 @@ export const reservationsRouter = router({
           'FINISHED',
           'NO_SHOW',
           'CANCELLED',
-          'EXPIRED',
         ]),
         reason: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const authedCtx = ctx as typeof ctx & AuthedRestaurantCtx
       const reservation = await ctx.prisma.reservation.findFirst({
         where: { id: input.reservationId, restaurantId: input.restaurantId },
         include: { customer: true, restaurant: true },
@@ -229,7 +242,7 @@ export const reservationsRouter = router({
       if (!reservation) throw new TRPCError({ code: 'NOT_FOUND' })
 
       const from = reservation.status
-      const to = input.status as any
+      const to = input.status as ReservationStatus
 
       const updated = await ctx.prisma.$transaction(async (tx: any) => {
         const res = await tx.reservation.update({
@@ -240,7 +253,7 @@ export const reservationsRouter = router({
               create: {
                 fromStatus: from,
                 toStatus: to,
-                changedBy: ctx.user?.id ?? 'SYSTEM',
+                changedBy: authedCtx.user.id,
                 reason: input.reason,
               },
             },

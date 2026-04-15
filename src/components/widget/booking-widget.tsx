@@ -25,13 +25,12 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   const [date, setDate]               = useState(format(new Date(), 'yyyy-MM-dd'))
   const [selectedSlot, setSelectedSlot] = useState<any>(null)
   const [lgpd, setLgpd]               = useState(false)
-  const [lgpdBc, setLgpdBc]           = useState(false)
   const [form, setForm]               = useState({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' })
 
   const primary = restaurant.themeConfig?.primaryColor ?? '#000000'
   const radius  = restaurant.themeConfig?.borderRadius  ?? '0.75rem'
 
-  const { data: slots, isLoading: slotsLoading } = api.shifts.getAvailableSlots.useQuery(
+  const { data: slots, isLoading: slotsLoading } = api.widget.getAvailableSlots.useQuery(
     { slug: restaurant.slug, date, partySize: guests },
     { enabled: step === 'slots' }
   )
@@ -45,8 +44,12 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
     if (!form.name.trim()) return toast.error('Informe seu nome')
     if (!form.phone.trim()) return toast.error('Informe seu WhatsApp')
     if (!lgpd) return toast.error('Aceite os termos para continuar')
-    const phone = form.phone.replace(/\D/g, '')
-    const e164 = phone.startsWith('55') ? `+${phone}` : `+55${phone}`
+    const normalizeToE164 = (raw: string): string => {
+      const digits = raw.replace(/\D/g, '')
+      if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
+      return `+55${digits}`
+    }
+    const e164 = normalizeToE164(form.phone)
     create.mutate({
       slug: restaurant.slug,
       guestName: form.name,
@@ -57,7 +60,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
       shiftId: selectedSlot.shiftId,
       occasion: form.occasion || undefined,
       dietaryNotes: form.dietaryNotes || undefined,
-      lgpdConsent: lgpdBc,
+      lgpdConsent: lgpd,
     })
   }
 
@@ -331,21 +334,6 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                       </span>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <div
-                        onClick={() => setLgpdBc(p => !p)}
-                        className={cn(
-                          'w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all',
-                          lgpdBc ? 'border-transparent' : 'border-zinc-600 bg-transparent'
-                        )}
-                        style={lgpdBc ? { backgroundColor: primary } : {}}
-                      >
-                        {lgpdBc && <span className="text-white text-[10px] font-bold">✓</span>}
-                      </div>
-                      <span className="text-xs text-zinc-500 leading-relaxed">
-                        🎁 Quero participar dos sorteios semanais e receber ofertas exclusivas dos parceiros do Porto Cabral BC em Balneário Camboriú. Opcional. LGPD — Lei 13.709/2018.
-                      </span>
-                    </label>
                   </div>
 
                   <button
@@ -388,7 +376,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   <p className="text-xs text-zinc-500 mt-3">Você receberá uma confirmação no WhatsApp.</p>
                 </div>
                 <button
-                  onClick={() => { setStep('config'); setSelectedSlot(null); setForm({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' }); setLgpd(false); setLgpdBc(false) }}
+                  onClick={() => { setStep('config'); setSelectedSlot(null); setForm({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' }); setLgpd(false) }}
                   className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors"
                 >
                   Fazer outra reserva

@@ -261,3 +261,8 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
   count     INTEGER     NOT NULL DEFAULT 1,
   "resetAt" TIMESTAMPTZ NOT NULL
 );
+
+-- Lembranças / pós-visita: evita reenvio duplicado pelo cron
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "reminder24hSentAt" TIMESTAMPTZ;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "reminder2hSentAt" TIMESTAMPTZ;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "postVisitSentAt" TIMESTAMPTZ;

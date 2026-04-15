@@ -208,6 +208,9 @@ model Reservation {
   source                ReservationSource @default(MANUAL)
   confirmToken          String?           @unique
   confirmTokenExpiresAt DateTime?
+  reminder24hSentAt     DateTime?
+  reminder2hSentAt    DateTime?
+  postVisitSentAt       DateTime?
   lgpdConsent           Boolean           @default(false)
   lgpdConsentAt         DateTime?
   bcConnectSent         Boolean           @default(false)

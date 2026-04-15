@@ -4,7 +4,7 @@ import "./globals.css"
 import { AppProviders } from "./providers"
 import { cn } from "@/lib/utils"
 
-const figtree = Figtree({ subsets: ['latin'], variable: '--font-sans' })
+const figtree   = Figtree({ subsets: ['latin'], variable: '--font-sans' })
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] })
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] })
 
@@ -18,9 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="pt-BR"
-      suppressHydrationWarning
+      // "dark" fixo: o dashboard usa dark mode; o widget usa cores hardcoded.
+      // next-themes removido pois injeta <script> incompatível com React 19.
       className={cn(
-        "h-full antialiased",
+        "dark h-full antialiased",
         geistSans.variable,
         geistMono.variable,
         figtree.variable,

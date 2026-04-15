@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { nanoid } from 'nanoid'
+import type { ReservationStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { sendNotification } from '@/lib/notifications'
@@ -23,7 +24,7 @@ export async function getWidgetAvailability(params: { slug: string; date: string
       restaurantId: restaurant.id,
       date: { gte: start, lte: end },
       shiftId: { not: null },
-      status: { in: ['CONFIRMED', 'PENDING_PAYMENT', 'CHECKED_IN'] as any },
+      status: { in: ACTIVE_RESERVATION_STATUSES },
     },
     _sum: { partySize: true },
   })
@@ -66,6 +67,12 @@ export async function createWidgetReservation(params: {
   })
   if (!restaurant) throw new TRPCError({ code: 'NOT_FOUND' })
 
+  const prepaymentActive =
+    restaurant.prepaymentConfig != null &&
+    typeof restaurant.prepaymentConfig === 'object' &&
+    (restaurant.prepaymentConfig as Record<string, unknown>).prepayment_enabled === true
+  const initialStatus: ReservationStatus = prepaymentActive ? 'PENDING_PAYMENT' : 'CONFIRMED'
+
   const start = new Date(params.date)
   const end = new Date(params.date)
   start.setUTCHours(0, 0, 0, 0)
@@ -77,25 +84,47 @@ export async function createWidgetReservation(params: {
       shiftId: params.shiftId,
       date: { gte: start, lte: end },
       guestPhone: params.guestPhone,
-      status: { in: ACTIVE_RESERVATION_STATUSES as any },
+      status: { in: ACTIVE_RESERVATION_STATUSES },
     },
     select: { id: true },
   })
   if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'Já existe uma reserva ativa para este telefone' })
 
   const token = nanoid(32)
-  const initialStatus = restaurant.prepaymentConfig ? 'PENDING_PAYMENT' : 'CONFIRMED'
+
+  // Upsert customer so every widget reservation creates/updates a CRM profile
+  const customer = await prisma.customer.upsert({
+    where: { restaurantId_phone: { restaurantId: restaurant.id, phone: params.guestPhone } },
+    update: {
+      name: params.guestName,
+      email: params.guestEmail,
+      lgpdConsent: params.lgpdConsent,
+      lgpdConsentAt: params.lgpdConsent ? new Date() : undefined,
+      preferences: params.dietaryNotes ? { dietaryNotes: params.dietaryNotes } : undefined,
+    },
+    create: {
+      restaurantId: restaurant.id,
+      name: params.guestName,
+      phone: params.guestPhone,
+      email: params.guestEmail,
+      lgpdConsent: params.lgpdConsent,
+      lgpdConsentAt: params.lgpdConsent ? new Date() : undefined,
+      preferences: params.dietaryNotes ? { dietaryNotes: params.dietaryNotes } : undefined,
+      tags: [],
+    },
+  })
 
   const reservation = await prisma.reservation.create({
     data: {
       restaurantId: restaurant.id,
+      customerId: customer.id,
       guestName: params.guestName,
       guestPhone: params.guestPhone,
       guestEmail: params.guestEmail,
       partySize: params.partySize,
       date: params.date,
       shiftId: params.shiftId,
-      status: initialStatus as any,
+      status: initialStatus,
       occasion: params.occasion,
       dietaryNotes: params.dietaryNotes,
       source: 'WIDGET',
@@ -103,7 +132,7 @@ export async function createWidgetReservation(params: {
       confirmTokenExpiresAt: confirmTokenExpiresAt(params.date),
       lgpdConsent: params.lgpdConsent,
       lgpdConsentAt: params.lgpdConsent ? new Date() : null,
-      statusHistory: { create: { fromStatus: null, toStatus: initialStatus as any, changedBy: 'SYSTEM' } },
+      statusHistory: { create: { fromStatus: null, toStatus: initialStatus, changedBy: 'SYSTEM' } },
     },
     include: { restaurant: true, customer: true },
   })

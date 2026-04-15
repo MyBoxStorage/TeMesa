@@ -2,17 +2,17 @@ import { NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/prisma'
 
-function assertCronAuth(req: Request) {
+function isCronAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET ?? ''
-  if (!secret) return
+  if (!secret) return true
   const header = req.headers.get('authorization') ?? ''
-  if (header !== `Bearer ${secret}`) {
-    throw new Response('Unauthorized', { status: 401 })
-  }
+  return header === `Bearer ${secret}`
 }
 
 export async function GET(req: Request) {
-  assertCronAuth(req)
+  if (!isCronAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const now = new Date()
 
   const expired = await prisma.prepaymentRecord.findMany({

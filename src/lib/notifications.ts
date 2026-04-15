@@ -5,6 +5,7 @@ import type {
   Reservation,
   Restaurant,
 } from '@prisma/client'
+import { formatInTimeZone } from 'date-fns-tz'
 
 import { prisma } from '@/lib/prisma'
 import { sendWhatsApp } from '@/lib/zapi'
@@ -78,11 +79,12 @@ export async function sendNotification(params: {
     ? `${appUrl}/confirmar/${reservation.confirmToken}?action=cancel`
     : `${appUrl}`
 
+  const timezone = reservation.restaurant.timezone ?? 'America/Sao_Paulo'
   const vars: Record<string, string> = {
     guestName: reservation.guestName,
     restaurantName: reservation.restaurant.name,
-    date: new Date(reservation.date).toLocaleDateString('pt-BR'),
-    time: new Date(reservation.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    date: formatInTimeZone(new Date(reservation.date), timezone, 'dd/MM/yyyy'),
+    time: formatInTimeZone(new Date(reservation.date), timezone, 'HH:mm'),
     partySize: String(reservation.partySize),
     shiftName: '',
     tableArea: '',
