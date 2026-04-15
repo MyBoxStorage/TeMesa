@@ -1,0 +1,24 @@
+name: Cron — Lembretes WhatsApp
+
+# Roda a cada hora (minuto 0)
+# Chama /api/cron/reminders no TeMesa em produção
+# Envia lembretes 24h e 2h antes da reserva via Z-API
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: # permite rodar manualmente no GitHub
+
+jobs:
+  reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de lembretes
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders")
+          echo "HTTP status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Erro: status $response"
+            exit 1
+          fi
