@@ -1,94 +1,178 @@
-# TeMesa — Comandos para executar no PowerShell
+# TeMesa — Status do Projeto e Comandos de Operação
+# Última atualização: 15 de abril de 2026
 
-Execute na pasta do TeMesa:
-  cd C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa
+## ═══════════════════════════════════════════════════
+## REGRA PARA TODOS OS AGENTES DE IA NESTE PROJETO
+## ═══════════════════════════════════════════════════
 
----
+AGENTES SÓ PODEM USAR FERRAMENTAS DE FILESYSTEM (leitura e escrita de arquivos).
+QUALQUER COMANDO POWERSHELL/TERMINAL DEVE SER ENTREGUE AO USUÁRIO PARA EXECUÇÃO MANUAL.
+NUNCA execute comandos diretamente no terminal, mesmo que tenha acesso à ferramenta.
 
-## STATUS ATUAL ✅
+Formato obrigatório para entregar comandos ao usuário:
 
-Banco de dados: CRIADO (supabase-schema.sql executado)
-Restaurante:    CRIADO (porto-cabral-bc, ID: cmnzbponl000013bqspbcqxh5)
-Turnos:         CRIADOS (Almoço, Happy Hour, Jantar)
-Dev local:      FUNCIONANDO em http://localhost:3000
+  Execute no PowerShell dentro da pasta do projeto:
+  ```powershell
+  <comandos aqui>
+  ```
 
----
+Exemplos do que NUNCA fazer diretamente:
+  ❌ git add / git commit / git push
+  ❌ pnpm install / pnpm dev / pnpm build
+  ❌ netlify env:import
+  ❌ Remove-Item / rm -rf
+  ❌ prisma generate / prisma db push
 
-## COMANDOS DO DIA A DIA
-
-### Iniciar servidor de desenvolvimento
-  pnpm dev
-  Acesse: http://localhost:3000/r/porto-cabral-bc
-
-### Regenerar Prisma Client (após alterar schema.prisma)
-  pnpm prisma generate
-
-### Rodar seed novamente (re-cria restaurante e turnos sem duplicar)
-  pnpm tsx prisma/seed.ts
-
-### Limpar cache do Turbopack (se houver erros estranhos de CSS/resolução)
-  Remove-Item -Recurse -Force .next
-  pnpm dev
+Exemplos do que PODE fazer diretamente:
+  ✅ Ler arquivos com ferramentas de filesystem
+  ✅ Escrever/criar arquivos com ferramentas de filesystem
+  ✅ Listar diretórios com ferramentas de filesystem
 
 ---
 
-## DEPLOY PARA O NETLIFY
+## ═══════════════════════════════════════════════════
+## STATUS ATUAL ✅ FUNCIONANDO LOCALMENTE
+## ═══════════════════════════════════════════════════
 
-  git add -A
-  git commit -m "sua mensagem"
-  git push
+### Infraestrutura
+✅ Banco de dados (Supabase) — schema criado, tabelas ok
+✅ Restaurante porto-cabral-bc — criado com ID: cmnyw2nex00017btocqiyb0vs
+   (Nota: este é o restaurante criado via onboarding, diferente do seed inicial)
+✅ Turnos — Almoço (12h–15h30), Happy Hour (17h–19h Qui/Sex/Sáb), Jantar (19h–23h)
+✅ Admin — techgeniushq@gmail.com tem isAdmin=true no banco
+✅ Z-API — INSTANCE_ID e TOKEN configurados (CLIENT_TOKEN não necessário)
+✅ Resend — API key configurada (contato@globallanding.com.br)
 
-O Netlify faz o build automaticamente após o push.
-
-### Variáveis de ambiente no Netlify (configurar 1x)
-No painel: unique-sfogliatella-a00c01.netlify.app → Site settings → Environment variables
-
-  NEXT_PUBLIC_APP_URL   = https://unique-sfogliatella-a00c01.netlify.app
-  DIRECT_URL            = postgresql://postgres:16841684654temesa65419864196@db.krwizgdhhtgxkwdamjpc.supabase.co:5432/postgres
-  (+ todas as outras vars do .env)
-
-### Importar todas as vars de uma vez via CLI
-  netlify env:import .env
-
-### Forçar redeploy (após mudar vars NEXT_PUBLIC_*)
-  git commit --allow-empty -m "chore: trigger redeploy"
-  git push
-
----
-
-## TORNAR-SE ADMIN (só 1x, após primeiro login)
-
-No SQL Editor do Supabase:
-  UPDATE "User" SET "isAdmin" = true WHERE email = 'SEU@EMAIL.COM';
+### Dashboard — todas as rotas ✅ 200
+✅ /dashboard/reservas — lista, criar, filtrar, alterar status
+✅ /dashboard/mesas — editor de mapa
+✅ /dashboard/clientes — lista de clientes
+✅ /dashboard/waitlist — fila de espera
+✅ /admin — painel exclusivo do dono da plataforma
+✅ /r/porto-cabral-bc — widget público (banco conectado)
 
 ---
 
-## CONFIGURAR WHATSAPP — PENDENTE
+## CORREÇÕES APLICADAS
 
-No .env, substituir os TODO:
-  ZAPI_INSTANCE_ID=sua_instance_id
-  ZAPI_TOKEN=seu_token
-  ZAPI_CLIENT_TOKEN=seu_client_token
+### 1. tRPC v11 — enforceRestaurantRole (src/server/trpc.ts)
+PROBLEMA: `unstable_pipe` não propaga `input` para middlewares no tRPC v11.
+SOLUÇÃO: Reescrito usando `t.middleware` com `await getRawInput()` (API correta do tRPC v11).
+```ts
+// ERRADO (tRPC v10 / unstable_pipe)
+enforceAuth.unstable_pipe(async ({ ctx, next, input }) => { ... })
+
+// CORRETO (tRPC v11)
+t.middleware(async ({ ctx, next, getRawInput }) => {
+  const rawInput = await getRawInput()
+  const restaurantId = (rawInput as Record<string, unknown>)?.restaurantId as string
+})
+```
+
+### 2. next-themes — Script tag incompatível com React 19
+PROBLEMA: ThemeProvider injeta `<script>` que React 19 rejeita em Client Components.
+SOLUÇÃO: Removido ThemeProvider, classe `dark` aplicada diretamente no `<html>`.
+
+### 3. Tailwind CSS — cache Turbopack corrompido
+PROBLEMA: Turbopack procurava `tailwindcss` a partir de `C:\Users\pc\package-lock.json`.
+SOLUÇÃO: Limpar `.next` + restaurar globals.css completo.
+
+### 4. ReservationForm — inputs uncontrolled → controlled
+PROBLEMA: Campos sem defaultValues começavam como `undefined`.
+SOLUÇÃO: Todos os campos de texto iniciados com `''` no defaultValues.
+
+### 5. middleware.ts → proxy.ts
+PROBLEMA: Next.js 16 deprecou a convenção `middleware`.
+SOLUÇÃO: Arquivo renomeado para src/proxy.ts.
 
 ---
 
-## CONFIGURAR CRONS — PENDENTE
+## PRÓXIMOS PASSOS PARA IR AO AR (em ordem)
 
-No cron-job.org, criar 2 jobs:
+### PASSO 1 — Deploy no Netlify
 
-  Job 1 (a cada 5min):
-    URL: https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending
-    Header: Authorization: Bearer temesa_cron_secret_2026
+Execute no PowerShell dentro de C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa:
 
-  Job 2 (a cada 1h):
-    URL: https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders
-    Header: Authorization: Bearer temesa_cron_secret_2026
+```powershell
+netlify env:import .env
+git add -A
+git commit -m "fix: trpc v11 getRawInput, reservation form defaultValues, proxy rename"
+git push
+```
+
+Após o build concluir (~3 min), forçar redeploy para embutir vars NEXT_PUBLIC_*:
+```powershell
+git commit --allow-empty -m "chore: trigger redeploy with production env vars"
+git push
+```
+
+### PASSO 2 — Secret CRON_SECRET no GitHub
+GitHub → repositório TeMesa → Settings → Secrets and variables → Actions
+→ New repository secret:
+  Nome:  CRON_SECRET
+  Valor: temesa_cron_secret_2026
+
+### PASSO 3 — Tornar-se admin em produção
+Após fazer login em https://unique-sfogliatella-a00c01.netlify.app/sign-up
+com techgeniushq@gmail.com, executar no Supabase SQL Editor:
+  UPDATE "User" SET "isAdmin" = true WHERE email = 'techgeniushq@gmail.com';
+
+### PASSO 4 — Verificar widget no Porto Cabral
+O widget já está embebido em portocabralatual via TeMesaWidget.tsx.
+Aponta para: https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc
+Após deploy do TeMesa, aparece automaticamente na seção de reservas.
 
 ---
 
 ## URLS IMPORTANTES
 
-Widget Porto Cabral BC: https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc
-Dashboard:              https://unique-sfogliatella-a00c01.netlify.app/dashboard/reservas
-Onboarding:             https://unique-sfogliatella-a00c01.netlify.app/onboarding
-Confirmação cliente:    https://unique-sfogliatella-a00c01.netlify.app/confirmar/[token]
+| Recurso | URL |
+|---|---|
+| Widget Porto Cabral | https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc |
+| Dashboard operador | https://unique-sfogliatella-a00c01.netlify.app/dashboard/reservas |
+| Painel admin (só você) | https://unique-sfogliatella-a00c01.netlify.app/admin |
+| Onboarding parceiro | https://unique-sfogliatella-a00c01.netlify.app/onboarding |
+| Confirmar reserva | https://unique-sfogliatella-a00c01.netlify.app/confirmar/[token] |
+| Cron expire-pending | https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending |
+| Cron reminders | https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders |
+
+---
+
+## COMANDOS DO DIA A DIA
+
+### Iniciar dev local
+```powershell
+cd C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa
+pnpm dev
+```
+
+### Se CSS quebrar (erro do Turbopack)
+```powershell
+cd C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa
+Remove-Item -Recurse -Force .next
+pnpm dev
+```
+
+### Regenerar Prisma Client (após alterar schema.prisma)
+```powershell
+cd C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa
+pnpm prisma generate
+```
+
+### Re-rodar seed (idempotente)
+```powershell
+cd C:\Users\pc\Desktop\Projetos\balneario-camboriu\TeMesa
+pnpm tsx prisma/seed.ts
+```
+
+---
+
+## PENDÊNCIAS
+
+- [ ] Deploy Netlify (Passo 1)
+- [ ] Secret CRON_SECRET no GitHub (Passo 2)
+- [ ] isAdmin em produção (Passo 3)
+- [ ] Clerk production keys (atual: pk_test_ — ok para testes)
+- [ ] Z-API CLIENT_TOKEN (opcional — funciona sem)
+- [ ] Pagar.me (opcional — só se ativar pagamento antecipado)
+- [ ] Domínio personalizado no Netlify (opcional)

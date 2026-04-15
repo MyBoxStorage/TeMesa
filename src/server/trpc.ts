@@ -24,15 +24,12 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 export const router = t.router
 export const publicProcedure = t.procedure
 
-const enforceAuth = t.middleware(async ({ ctx, next }) => {
+// ── Shared helper: resolve or create the User record from Clerk session ───────
+async function resolveUser(ctx: { clerkUserId: string | null; prisma: typeof prisma }) {
   if (!ctx.clerkUserId) throw new TRPCError({ code: 'UNAUTHORIZED' })
 
-  let user = await ctx.prisma.user.findUnique({
-    where: { clerkId: ctx.clerkUserId },
-  })
-
+  let user = await ctx.prisma.user.findUnique({ where: { clerkId: ctx.clerkUserId } })
   if (!user) {
-    // Fallback: try to find by email (handles clerkId drift after social logins)
     const clerkUser = await currentUser()
     if (!clerkUser) throw new TRPCError({ code: 'UNAUTHORIZED' })
 
@@ -40,7 +37,6 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
     if (email) {
       user = await ctx.prisma.user.findUnique({ where: { email } })
       if (user) {
-        // Sync the clerkId to the current value
         user = await ctx.prisma.user.update({
           where: { id: user.id },
           data: { clerkId: ctx.clerkUserId },
@@ -49,7 +45,10 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
     }
 
     if (!user) {
-      const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || email || 'Usuário'
+      const name =
+        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
+        email ||
+        'Usuário'
       user = await ctx.prisma.user.create({
         data: {
           clerkId: ctx.clerkUserId,
@@ -60,24 +59,34 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
     }
   }
 
+  return user
+}
+
+// ── enforceAuth ────────────────────────────────────────────────────────────────
+const enforceAuth = t.middleware(async ({ ctx, next }) => {
+  const user = await resolveUser(ctx)
   return next({ ctx: { ...ctx, user } })
 })
 
 const ROLE_HIERARCHY: StaffRole[] = ['STAFF', 'HOSTESS', 'MANAGER', 'OWNER']
 
+// ── enforceRestaurantRole ─────────────────────────────────────────────────────
+// In tRPC v11, middleware does NOT receive `input` directly.
+// The actual request input is obtained via `await getRawInput()`.
+// This is the correct API as documented in the tRPC v11 middleware source.
 export const enforceRestaurantRole = (minRole: StaffRole) =>
-  enforceAuth.unstable_pipe(async ({ ctx, next, input }) => {
-    const restaurantId = (input as Record<string, unknown>)?.restaurantId as string
+  t.middleware(async ({ ctx, next, getRawInput }) => {
+    const user = await resolveUser(ctx)
+
+    const rawInput = await getRawInput()
+    const restaurantId = (rawInput as Record<string, unknown>)?.restaurantId as string
     if (!restaurantId)
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'restaurantId obrigatório' })
-
-    // enforceAuth has already added `user` to ctx; cast so TypeScript knows
-    const authedCtx = ctx as typeof ctx & { user: User }
 
     const membership = await ctx.prisma.userRestaurant.findUnique({
       where: {
         userId_restaurantId: {
-          userId: authedCtx.user.id,
+          userId: user.id,
           restaurantId,
         },
       },
@@ -88,27 +97,25 @@ export const enforceRestaurantRole = (minRole: StaffRole) =>
       throw new TRPCError({ code: 'FORBIDDEN', message: `Requer papel ${minRole} ou superior` })
     }
 
-    return next({ ctx: { ...ctx, user: authedCtx.user, membership, restaurantId } })
+    return next({ ctx: { ...ctx, user, membership, restaurantId } })
   })
 
-export const protectedProcedure = t.procedure.use(enforceAuth)
-
-// adminProcedure: authenticated + isAdmin flag on the User record.
-// Only platform super-admins can call these procedures.
-const enforceAdmin = enforceAuth.unstable_pipe(async ({ ctx, next }) => {
-  const authedCtx = ctx as typeof ctx & { user: User }
-  if (!authedCtx.user.isAdmin) {
+// ── enforceAdmin ──────────────────────────────────────────────────────────────
+const enforceAdmin = t.middleware(async ({ ctx, next }) => {
+  const user = await resolveUser(ctx)
+  if (!user.isAdmin) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso restrito a administradores da plataforma' })
   }
-  return next({ ctx: { ...ctx, user: authedCtx.user } })
+  return next({ ctx: { ...ctx, user } })
 })
-export const adminProcedure = t.procedure.use(enforceAdmin)
-// staffProcedure: authenticated + member of the restaurant at any role level.
-// Use for all read endpoints that accept restaurantId — prevents cross-tenant data leaks.
-export const staffProcedure     = t.procedure.use(enforceRestaurantRole('STAFF'))
-export const hostessProcedure   = t.procedure.use(enforceRestaurantRole('HOSTESS'))
-export const managerProcedure   = t.procedure.use(enforceRestaurantRole('MANAGER'))
-export const ownerProcedure     = t.procedure.use(enforceRestaurantRole('OWNER'))
+
+export const protectedProcedure = t.procedure.use(enforceAuth)
+export const adminProcedure     = t.procedure.use(enforceAdmin)
+
+export const staffProcedure   = t.procedure.use(enforceRestaurantRole('STAFF'))
+export const hostessProcedure = t.procedure.use(enforceRestaurantRole('HOSTESS'))
+export const managerProcedure = t.procedure.use(enforceRestaurantRole('MANAGER'))
+export const ownerProcedure   = t.procedure.use(enforceRestaurantRole('OWNER'))
 
 export type AuthedRestaurantCtx = {
   user: User

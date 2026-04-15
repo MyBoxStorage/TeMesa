@@ -55,22 +55,26 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      time: '19:00',
-      partySize: 2,
-      source: 'MANUAL',
-      lgpdConsent: false,
+      guestName:    '',
+      guestPhone:   '',
+      guestEmail:   '',
+      partySize:    2,
+      date:         format(new Date(), 'yyyy-MM-dd'),
+      time:         '19:00',
+      occasion:     '',
+      dietaryNotes: '',
+      notes:        '',
+      source:       'MANUAL',
+      lgpdConsent:  false,
     },
   })
 
   const onSubmit = (values: FormValues) => {
     const dateTime = new Date(`${values.date}T${values.time}:00`)
-    const normalizeToE164 = (raw: string): string => {
-      const digits = raw.replace(/\D/g, '')
-      if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
-      return `+55${digits}`
-    }
-    const e164 = normalizeToE164(values.guestPhone)
+    const digits = values.guestPhone.replace(/\D/g, '')
+    const e164 = digits.startsWith('55') && digits.length >= 12
+      ? `+${digits}`
+      : `+55${digits}`
 
     create.mutate({
       restaurantId,
@@ -105,7 +109,7 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
               </FormItem>
             )} />
 
-            {/* Phone + Email row */}
+            {/* Phone + Email */}
             <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="guestPhone" render={({ field }) => (
                 <FormItem>
@@ -159,7 +163,7 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
             <FormField control={form.control} name="occasion" render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[12px]">Ocasião especial</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className="h-9 text-[12px]">
                       <SelectValue placeholder="Selecione..." />
@@ -195,7 +199,7 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
             <FormField control={form.control} name="source" render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[12px]">Canal de origem</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className="h-9 text-[12px]"><SelectValue /></SelectTrigger>
                   </FormControl>
