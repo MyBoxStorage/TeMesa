@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, SkeletonCard } from '@/components/common/empty-state'
 import { CustomerDetail } from '@/components/clientes/customer-detail'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { cn } from '@/lib/utils'
+
+type CustomerItem = RouterOutputs['customers']['list'][number]
 
 const AVATAR_COLORS = [
   'from-blue-600 to-blue-800', 'from-emerald-600 to-emerald-800',
@@ -29,7 +31,7 @@ export default function ClientesPage() {
     tags: selectedTags.length ? selectedTags : undefined,
   }, { enabled: !!restaurantId })
 
-  const allTags = [...new Set(customers?.flatMap(c => c.tags ?? []) ?? [])]
+  const allTags: string[] = [...new Set(customers?.flatMap((c: CustomerItem) => c.tags ?? []) ?? [])]
   const toggleTag = (tag: string) =>
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
 

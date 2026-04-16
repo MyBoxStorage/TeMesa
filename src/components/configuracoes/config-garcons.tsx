@@ -5,8 +5,10 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/common/empty-state'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { toast } from 'sonner'
+
+type ServerItem = RouterOutputs['servers']['list'][number]
 import { ServerCreateModal } from '@/components/garcons/server-create-modal'
 
 export function ConfigGarcons({ restaurantId }: { restaurantId: string }) {
@@ -43,7 +45,7 @@ export function ConfigGarcons({ restaurantId }: { restaurantId: string }) {
         <EmptyState title="Nenhum garçom" description="Adicione garçons para organizar o atendimento." />
       ) : (
         <div className="space-y-2">
-          {servers?.map(s => (
+          {servers?.map((s: ServerItem) => (
             <div key={s.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-xl">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-[12px] font-bold shrink-0">
                 {s.name[0].toUpperCase()}

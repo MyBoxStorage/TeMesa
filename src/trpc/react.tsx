@@ -5,13 +5,15 @@ import { httpBatchLink } from '@trpc/client'
 import { createTRPCReact } from '@trpc/react-query'
 import superjson from 'superjson'
 import { useState, type ReactNode } from 'react'
+import type { inferRouterOutputs, inferRouterInputs } from '@trpc/server'
 
 import type { AppRouter } from '@/server/root-router'
 
 export const trpc = createTRPCReact<AppRouter>()
-
-// Alias `api` para compatibilidade com todos os componentes
 export const api = trpc
+
+export type RouterOutputs = inferRouterOutputs<AppRouter>
+export type RouterInputs  = inferRouterInputs<AppRouter>
 
 function getBaseUrl() {
   if (typeof window !== 'undefined') return ''

@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { Mail, Plus, Clock, CheckCircle2, XCircle, RotateCcw, Trash2, Send } from 'lucide-react'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+type InvitationItem = RouterOutputs['admin']['listInvitations']['items'][number]
 
 const STATUS_STYLE: Record<string, { label: string; color: string }> = {
   PENDING:  { label: 'Pendente',  color: 'bg-amber-500/20 text-amber-300'  },
@@ -163,7 +165,7 @@ export default function ConvitesAdminPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {invitations.map((inv: { id: string; email: string; restaurantName: string; token: string; status: string; expiresAt: Date; usedAt: Date | null; notes: string | null; createdAt: Date }) => {
+          {invitations.map((inv: InvitationItem) => {
             const isExpiredByDate = inv.expiresAt <= new Date()
             const effectiveStatus = isExpiredByDate && inv.status === 'PENDING' ? 'EXPIRED' : inv.status
             const style = STATUS_STYLE[effectiveStatus] ?? STATUS_STYLE.EXPIRED
