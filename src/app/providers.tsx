@@ -7,15 +7,21 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import { TrpcProvider } from '@/trpc/react'
 
-export function AppProviders(props: { children: ReactNode }) {
+export function PublicProviders(props: { children: ReactNode }) {
+  return (
+    <TooltipProvider>
+      <TrpcProvider>
+        {props.children}
+        <Toaster />
+      </TrpcProvider>
+    </TooltipProvider>
+  )
+}
+
+export function AuthedProviders(props: { children: ReactNode }) {
   return (
     <ClerkProvider>
-      <TooltipProvider>
-        <TrpcProvider>
-          {props.children}
-          <Toaster />
-        </TrpcProvider>
-      </TooltipProvider>
+      {props.children}
     </ClerkProvider>
   )
 }

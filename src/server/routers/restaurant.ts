@@ -154,4 +154,36 @@ export const restaurantRouter = router({
         data: { bcConnectPartnerId: input.partnerId, bcConnectApiKey: encrypted },
       })
     }),
+
+  updatePrepaymentConfig: ownerProcedure
+    .input(
+      z.object({
+        restaurantId: z.string(),
+        prepayment_enabled: z.boolean(),
+        prepayment_type: z.enum(['POR_PESSOA', 'VALOR_FIXO', 'PERCENTUAL']).optional(),
+        prepayment_amount: z.number().min(0).optional(),
+        prepayment_applies_to: z.enum(['TODAS_RESERVAS', 'FERIADOS', 'FINAIS_DE_SEMANA', 'MANUAL']).optional(),
+        no_show_policy: z.enum(['COBRAR_TOTAL', 'COBRAR_PARCIAL', 'REEMBOLSAR', 'CREDITO']).optional(),
+        cancellation_deadline_hours: z.number().int().min(0).optional(),
+        prepayment_expiry_minutes: z.number().int().min(5).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { restaurantId, ...config } = input
+      const data = config.prepayment_enabled ? config : { prepayment_enabled: false }
+      return ctx.prisma.restaurant.update({
+        where: { id: restaurantId },
+        data: { prepaymentConfig: data as any },
+      })
+    }),
+
+  getPrepaymentConfig: ownerProcedure
+    .input(z.object({ restaurantId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const r = await ctx.prisma.restaurant.findUnique({
+        where: { id: input.restaurantId },
+        select: { prepaymentConfig: true, plan: true },
+      })
+      return { config: r?.prepaymentConfig ?? null, plan: r?.plan ?? 'GRATUITO' }
+    }),
 })

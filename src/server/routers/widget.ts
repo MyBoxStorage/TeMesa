@@ -75,4 +75,16 @@ export const widgetRouter = router({
         lgpdConsent: input.lgpdConsent,
       })
     }),
+
+  // Called by the widget to poll payment status after showing the Pix QR
+  getPaymentStatus: publicProcedure
+    .input(z.object({ prepaymentRecordId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const record = await ctx.prisma.prepaymentRecord.findUnique({
+        where: { id: input.prepaymentRecordId },
+        select: { status: true, expiresAt: true },
+      })
+      if (!record) return { status: 'NOT_FOUND' as const }
+      return { status: record.status, expiresAt: record.expiresAt }
+    }),
 })

@@ -64,7 +64,11 @@ async function createReservationCore(params: {
   })
   if (!restaurant) throw new TRPCError({ code: 'NOT_FOUND', message: 'Restaurante não encontrado' })
 
+  // Pagamento antecipado via Pix NUNCA se aplica a reservas criadas manualmente pelo operador.
+  // O fluxo de Pix é exclusivo para reservas de origem WIDGET (auto-atendimento do cliente).
+  const isWidgetSource = input.source === 'WIDGET'
   const prepaymentActive =
+    isWidgetSource &&
     restaurant.prepaymentConfig != null &&
     typeof restaurant.prepaymentConfig === 'object' &&
     (restaurant.prepaymentConfig as Record<string, unknown>).prepayment_enabled === true

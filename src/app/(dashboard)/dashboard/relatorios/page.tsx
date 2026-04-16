@@ -1,15 +1,25 @@
 'use client'
 
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { Users, Calendar, AlertTriangle, BarChart3 } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, BarChart3, Download } from 'lucide-react'
 import { api } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { SkeletonCard } from '@/components/common/empty-state'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 const CHANNEL_COLORS = ['#3b82f6','#22c55e','#f59e0b','#a855f7','#ef4444']
 const CHANNEL_LABELS: Record<string, string> = {
   MANUAL: 'Manual', WIDGET: 'Widget', WHATSAPP: 'WhatsApp', PHONE: 'Telefone', IFOOD: 'iFood',
+}
+
+function exportCSV(rows: string[][], filename: string) {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
 }
 
 export default function RelatoriosPage() {
@@ -21,6 +31,23 @@ export default function RelatoriosPage() {
     { restaurantId: restaurantId! }, { enabled: !!restaurantId })
   const { data: topCustomers } = api.analytics.getTopCustomers.useQuery(
     { restaurantId: restaurantId!, limit: 5 }, { enabled: !!restaurantId })
+
+  const handleExportOcupacao = () => {
+    if (!occupancy) return
+    exportCSV(
+      [['Data', 'Pessoas'], ...occupancy.map(r => [r.date, String(r.covers)])],
+      'ocupacao-30dias.csv'
+    )
+  }
+
+  const handleExportClientes = () => {
+    if (!topCustomers) return
+    exportCSV(
+      [['Nome', 'Telefone', 'Visitas', 'No-shows', 'Score'],
+       ...topCustomers.map((c: any) => [c.name, c.phone, String(c.visitCount), String(c.noShowCount), String(Math.round(c.reliabilityScore))])],
+      'top-clientes.csv'
+    )
+  }
 
   if (!restaurantId) return null
 
@@ -38,7 +65,12 @@ export default function RelatoriosPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <h1 className="text-[18px] font-semibold">Relatórios</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-[18px] font-semibold">Relatórios</h1>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={handleExportOcupacao} disabled={!occupancy?.length}>
+          <Download className="w-3.5 h-3.5" /> Exportar CSV
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -101,7 +133,12 @@ export default function RelatoriosPage() {
 
       {topCustomers && topCustomers.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-[13px] font-medium mb-4">Top clientes</p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[13px] font-medium">Top clientes</p>
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-[11px]" onClick={handleExportClientes}>
+              <Download className="w-3 h-3" /> CSV
+            </Button>
+          </div>
           <div className="space-y-2">
             {topCustomers.map((c: any, i: number) => (
               <div key={c.id} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { UtensilsCrossed, LayoutDashboard, Building2, Mail, ArrowLeft } from 'lucide-react'
+import { AuthedProviders } from '@/app/providers'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { userId: clerkUserId } = await auth()
@@ -12,7 +13,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user?.isAdmin) redirect('/dashboard/reservas')
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-white overflow-hidden">
+    <AuthedProviders>
+      <div className="flex h-screen bg-[#0a0a0a] text-white overflow-hidden">
 
       {/* Sidebar */}
       <aside className="w-56 shrink-0 border-r border-zinc-800 flex flex-col">
@@ -60,6 +62,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
-    </div>
+      </div>
+    </AuthedProviders>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import { Plus, Search, SlidersHorizontal, List, Clock } from 'lucide-react'
+import { Plus, Search, SlidersHorizontal, List, Clock, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,13 @@ export default function ReservasPage() {
     status: statusFilter !== 'all' ? (statusFilter as any) : undefined,
     search: search || undefined,
   }, { enabled: !!restaurantId, retry: false })
+
+  // Verifica silenciosamente se o sinal Pix está ativo — usado só para o badge informativo
+  const { data: paymentCfg } = api.restaurant.getPrepaymentConfig.useQuery(
+    { restaurantId: restaurantId! },
+    { enabled: !!restaurantId }
+  )
+  const pixAtivo = (paymentCfg?.config as Record<string, unknown> | null)?.prepayment_enabled === true
 
   const filtered = reservations ?? []
 
@@ -97,9 +104,20 @@ export default function ReservasPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[12px] text-muted-foreground">
-              {filtered.length} reserva{filtered.length !== 1 ? 's' : ''} · {dateStr}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-muted-foreground">
+                {filtered.length} reserva{filtered.length !== 1 ? 's' : ''} · {dateStr}
+              </span>
+              {pixAtivo && (
+                <a
+                  href="/dashboard/configuracoes?tab=pagamento"
+                  title="Sinal Pix ativo — clique para configurar"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-medium hover:bg-green-500/25 transition-colors"
+                >
+                  <Zap className="w-2.5 h-2.5" /> Sinal Pix ativo
+                </a>
+              )}
+            </div>
             <div className="flex gap-1">
               <Button size="icon" variant={view === 'list' ? 'secondary' : 'ghost'} className="h-6 w-6" onClick={() => setView('list')}>
                 <List className="w-3 h-3" />
@@ -108,8 +126,7 @@ export default function ReservasPage() {
                 <Clock className="w-3 h-3" />
               </Button>
             </div>
-          </div>
-        </div>
+          </div>        </div>
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (

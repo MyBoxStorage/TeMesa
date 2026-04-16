@@ -24,6 +24,20 @@ export const analyticsRouter = router({
       })
       const coversHoje = coversAgg._sum.partySize ?? 0
 
+      // Taxa de ocupação = pessoas confirmadas hoje / capacidade total dos turnos ativos hoje
+      const diaDaSemana = now.getUTCDay()
+      const turnosHoje = await ctx.prisma.shift.findMany({
+        where: {
+          restaurantId: input.restaurantId,
+          isActive: true,
+          daysOfWeek: { has: diaDaSemana },
+          maxCapacity: { gt: 0 },
+        },
+        select: { maxCapacity: true },
+      })
+      const capacidadeTotal = turnosHoje.reduce((acc, t) => acc + (t.maxCapacity ?? 0), 0)
+      const taxaOcupacao = capacidadeTotal > 0 ? Math.min(100, Math.round((coversHoje / capacidadeTotal) * 100)) : 0
+
       const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
       const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999))
       const noShowsMes = await ctx.prisma.reservation.count({
@@ -49,7 +63,7 @@ export const analyticsRouter = router({
       return {
         reservasHoje,
         coversHoje,
-        taxaOcupacao: 0,
+        taxaOcupacao,
         noShowsMes,
         clientesNovos30dias,
         reservasPorCanal: Object.fromEntries(reservasPorCanal.map((r) => [r.source, r._count._all])),

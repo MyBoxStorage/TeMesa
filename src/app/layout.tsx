@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, Figtree } from "next/font/google"
 import "./globals.css"
-import { AppProviders } from "./providers"
 import { cn } from "@/lib/utils"
+import { PublicProviders } from "./providers"
 
 const figtree   = Figtree({ subsets: ['latin'], variable: '--font-sans' })
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] })
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       )}
     >
       <body className="min-h-full flex flex-col">
-        <AppProviders>{children}</AppProviders>
+        <PublicProviders>{children}</PublicProviders>
       </body>
     </html>
   )

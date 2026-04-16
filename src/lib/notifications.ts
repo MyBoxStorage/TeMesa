@@ -59,6 +59,16 @@ export const DEFAULT_TEMPLATES: Record<
   },
 }
 
+const EMAIL_SUBJECTS: Record<NotificationTrigger, string> = {
+  RESERVATION_CREATED: 'Reserva confirmada em {{restaurantName}}',
+  REMINDER_24H:        'Lembrete: sua reserva amanhã em {{restaurantName}}',
+  REMINDER_2H:         'Sua reserva em {{restaurantName}} é em 2 horas',
+  PAYMENT_CONFIRMED:   'Pagamento confirmado — {{restaurantName}}',
+  WAITLIST_AVAILABLE:  'Mesa disponível em {{restaurantName}}!',
+  POST_VISIT:          'Obrigado pela visita ao {{restaurantName}}',
+  CANCELLED:           'Reserva cancelada — {{restaurantName}}',
+}
+
 function interpolateTemplate(template: string, vars: Record<string, string>): string {
   return template.replaceAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => vars[key] ?? '')
 }
@@ -115,7 +125,8 @@ export async function sendNotification(params: {
     try {
       const resend = getResendClient()
       const from = process.env.RESEND_FROM_EMAIL ?? 'noreply@temesa.app'
-      const subject = `TeMesa • ${trigger}`
+      const subjectTemplate = EMAIL_SUBJECTS[trigger] ?? `TeMesa — ${trigger}`
+      const subject = interpolateTemplate(subjectTemplate, vars)
       const text = interpolateTemplate(email, vars)
       await resend.emails.send({ from, to: reservation.guestEmail, subject, text })
     } catch (err) {

@@ -1,20 +1,28 @@
 'use client'
 
+import { useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Plus, QrCode, Clock, Users } from 'lucide-react'
+import { Plus, QrCode, Clock, Users, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { EmptyState, SkeletonRow } from '@/components/common/empty-state'
 import { api } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
+const e164 = (raw: string) => { const d = raw.replace(/\D/g, ''); return d.startsWith('55') ? `+${d}` : `+55${d}` }
+
 export default function WaitlistPage() {
   const { restaurantId } = useDashboard()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const [showAdd, setShowAdd] = useState(false)
+  const [showQr, setShowQr]   = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', phone: '', partySize: 2 })
 
   const { data: entries, isLoading } = api.waitlist.list.useQuery(
     { restaurantId: restaurantId!, date: today }, { enabled: !!restaurantId })
@@ -22,6 +30,10 @@ export default function WaitlistPage() {
   const utils = api.useUtils()
   const notify = api.waitlist.notifyNext.useMutation({
     onSuccess: () => { utils.waitlist.list.invalidate(); toast.success('Notificação enviada!') },
+  })
+  const addToWaitlist = api.waitlist.add.useMutation({
+    onSuccess: () => { utils.waitlist.list.invalidate(); setShowAdd(false); setAddForm({ name: '', phone: '', partySize: 2 }); toast.success('Adicionado à fila!') },
+    onError: (e) => toast.error(e.message),
   })
 
   const waiting  = entries?.filter(e => e.status === 'WAITING')  ?? []
@@ -40,10 +52,10 @@ export default function WaitlistPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2 h-8 text-[12px]">
+          <Button variant="outline" size="sm" className="gap-2 h-8 text-[12px]" onClick={() => setShowQr(true)}>
             <QrCode className="w-3.5 h-3.5" />QR Code
           </Button>
-          <Button size="sm" className="gap-2 h-8 text-[12px]">
+          <Button size="sm" className="gap-2 h-8 text-[12px]" onClick={() => setShowAdd(true)}>
             <Plus className="w-3.5 h-3.5" />Adicionar
           </Button>
         </div>
@@ -87,6 +99,55 @@ export default function WaitlistPage() {
             ))
         }
       </section>
+
+      {/* Modal Adicionar */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[15px] font-semibold">Adicionar à fila</h2>
+              <button onClick={() => setShowAdd(false)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-[12px]">Nome</Label>
+                <Input className="h-9 text-[13px]" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do cliente" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[12px]">WhatsApp</Label>
+                <Input className="h-9 text-[13px]" value={addForm.phone} onChange={e => setAddForm(p => ({ ...p, phone: e.target.value }))} placeholder="+55 (00) 00000-0000" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[12px]">Pessoas</Label>
+                <Input type="number" min={1} max={20} className="h-9 text-[13px]" value={addForm.partySize} onChange={e => setAddForm(p => ({ ...p, partySize: parseInt(e.target.value) || 1 }))} />
+              </div>
+              <Button className="w-full h-9 text-[13px] mt-2" disabled={!addForm.name || !addForm.phone || addToWaitlist.isPending}
+                onClick={() => addToWaitlist.mutate({ restaurantId: restaurantId!, guestName: addForm.name, guestPhone: e164(addForm.phone), partySize: addForm.partySize, date: new Date() })}>
+                {addToWaitlist.isPending ? 'Adicionando...' : 'Adicionar à fila'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal QR Code */}
+      {showQr && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowQr(false)}>
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs shadow-xl text-center" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[15px] font-semibold">QR da fila de espera</h2>
+              <button onClick={() => setShowQr(false)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="bg-white rounded-xl p-4 flex items-center justify-center mb-3">
+              <QrCode className="w-32 h-32 text-black" />
+            </div>
+            <p className="text-[12px] text-muted-foreground">Aponte a câmera para entrar na fila</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1 font-mono break-all">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/r/...?waitlist=1
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

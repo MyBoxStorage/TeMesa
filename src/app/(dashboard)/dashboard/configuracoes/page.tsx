@@ -8,6 +8,7 @@ import { ConfigNotificacoes } from '@/components/configuracoes/config-notificaco
 import { ConfigAutoTags } from '@/components/configuracoes/config-autotags'
 import { ConfigGarcons } from '@/components/configuracoes/config-garcons'
 import { ConfigIntegracao } from '@/components/configuracoes/config-integracao'
+import { ConfigPagamento } from '@/components/configuracoes/config-pagamento'
 import { useDashboard } from '../layout'
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   ['tema',         'Tema'],
   ['turnos',       'Turnos'],
   ['notificacoes', 'Notificações'],
+  ['pagamento',    'Pagamento'],
   ['autotags',     'Auto-Tags'],
   ['garcons',      'Garçons'],
   ['integracao',   'Integração'],
@@ -46,6 +48,7 @@ export default function ConfiguracoesPage() {
           <TabsContent value="tema">         <ConfigTema         restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="turnos">       <ConfigTurnos       restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="notificacoes"> <ConfigNotificacoes restaurantId={restaurantId} /></TabsContent>
+          <TabsContent value="pagamento">    <ConfigPagamento    restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="autotags">     <ConfigAutoTags     restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="garcons">      <ConfigGarcons      restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="integracao">   <ConfigIntegracao   restaurantId={restaurantId} /></TabsContent>

@@ -50,5 +50,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     lgpdConsent: parsed.data.lgpdConsent,
   })
 
-  return NextResponse.json({ id: reservation.id, status: reservation.status })
+  return NextResponse.json({ id: reservation.reservationId, status: reservation.status })
 }

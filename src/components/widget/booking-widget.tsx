@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Users, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { Users, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2, Loader2, AlertCircle, Copy, Check } from 'lucide-react'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-type Step = 'config' | 'slots' | 'form' | 'success'
+type Step = 'config' | 'slots' | 'form' | 'pix' | 'success'
 
 interface Restaurant {
   id: string; name: string; slug: string
@@ -26,6 +26,8 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   const [selectedSlot, setSelectedSlot] = useState<any>(null)
   const [lgpd, setLgpd]               = useState(false)
   const [form, setForm]               = useState({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' })
+  const [pixData, setPixData]         = useState<{ pixCode: string; pixQrCodeUrl: string; amountCents: number; expiresAt: Date; prepaymentRecordId: string } | null>(null)
+  const [copied, setCopied]           = useState(false)
 
   const primary = restaurant.themeConfig?.primaryColor ?? '#000000'
   const radius  = restaurant.themeConfig?.borderRadius  ?? '0.75rem'
@@ -36,9 +38,36 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   )
 
   const create = api.widget.createReservation.useMutation({
-    onSuccess: () => setStep('success'),
+    onSuccess: (data) => {
+      if (data.prepayment) {
+        setPixData({ ...data.prepayment })
+        setStep('pix')
+      } else {
+        setStep('success')
+      }
+    },
     onError: (e) => toast.error(e.message),
   })
+
+  // Poll payment status when on pix step
+  const { data: paymentStatus } = api.widget.getPaymentStatus.useQuery(
+    { prepaymentRecordId: pixData?.prepaymentRecordId ?? '' },
+    {
+      enabled: step === 'pix' && !!pixData?.prepaymentRecordId,
+      refetchInterval: 5000,
+    }
+  )
+  useEffect(() => {
+    if (paymentStatus?.status === 'PAID') setStep('success')
+  }, [paymentStatus])
+
+  const copyPix = useCallback(() => {
+    if (!pixData) return
+    navigator.clipboard.writeText(pixData.pixCode).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [pixData])
 
   const handleSubmit = () => {
     if (!form.name.trim()) return toast.error('Informe seu nome')
@@ -351,6 +380,47 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
             </motion.div>
           )}
 
+          {/* ── STEP PIX ── */}
+          {step === 'pix' && pixData && (
+            <motion.div key="pix" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+                <div className="p-5 border-b border-zinc-800 text-center">
+                  <p className="text-sm font-semibold text-white mb-0.5">Pague o sinal para confirmar</p>
+                  <p className="text-2xl font-bold" style={{ color: primary }}>
+                    {(pixData.amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">Pix • Expira às {format(new Date(pixData.expiresAt), 'HH:mm')}</p>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  {pixData.pixQrCodeUrl && (
+                    <div className="flex justify-center">
+                      <img src={pixData.pixQrCodeUrl} alt="QR Code Pix" className="w-44 h-44 rounded-xl bg-white p-2" />
+                    </div>
+                  )}
+
+                  <div className="bg-zinc-800 rounded-xl p-3">
+                    <p className="text-[10px] text-zinc-500 mb-1.5 uppercase tracking-wider">Pix copia e cola</p>
+                    <p className="text-[11px] text-zinc-300 font-mono break-all leading-relaxed line-clamp-3">{pixData.pixCode}</p>
+                  </div>
+
+                  <button
+                    onClick={copyPix}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                    style={{ backgroundColor: primary }}
+                  >
+                    {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> Copiar código Pix</>}
+                  </button>
+
+                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Aguardando confirmação do pagamento...
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* ── STEP 4: SUCCESS ── */}
           {step === 'success' && (
             <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
@@ -376,7 +446,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   <p className="text-xs text-zinc-500 mt-3">Você receberá uma confirmação no WhatsApp.</p>
                 </div>
                 <button
-                  onClick={() => { setStep('config'); setSelectedSlot(null); setForm({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' }); setLgpd(false) }}
+                  onClick={() => { setStep('config'); setSelectedSlot(null); setForm({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' }); setLgpd(false); setPixData(null) }}
                   className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors"
                 >
                   Fazer outra reserva
@@ -389,8 +459,12 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
         {/* Language + Footer */}
         <div className="flex items-center justify-center gap-4 mt-5">
-          {['PT', 'EN', 'ES'].map(l => (
-            <button key={l} className={cn('text-[10px] font-medium transition-colors', l === 'PT' ? 'text-zinc-400' : 'text-zinc-600 hover:text-zinc-400')}>
+          {(['PT', 'EN', 'ES'] as const).map(l => (
+            <button
+              key={l}
+              className={cn('text-[10px] font-medium transition-colors', l === 'PT' ? 'text-zinc-400' : 'text-zinc-600 hover:text-zinc-400')}
+              title={l === 'PT' ? 'Português' : l === 'EN' ? 'English' : 'Español'}
+            >
               {l}
             </button>
           ))}

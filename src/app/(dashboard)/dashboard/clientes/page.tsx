@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, SkeletonCard } from '@/components/common/empty-state'
+import { CustomerDetail } from '@/components/clientes/customer-detail'
 import { api } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ export default function ClientesPage() {
   const { restaurantId } = useDashboard()
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
   const { data: customers, isLoading } = api.customers.list.useQuery({
     restaurantId: restaurantId!,
@@ -83,6 +85,7 @@ export default function ClientesPage() {
             return (
               <motion.div key={customer.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.03 }}
+                onClick={() => setSelectedCustomerId(customer.id)}
                 className="bg-card border border-border rounded-xl p-4 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer">
                 <div className="flex items-start gap-3 mb-3">
                   <div className={cn('w-11 h-11 rounded-full bg-gradient-to-br flex items-center justify-center text-[14px] font-bold text-white shrink-0', color)}>
@@ -124,6 +127,14 @@ export default function ClientesPage() {
             )
           })}
         </div>
+      )}
+
+      {selectedCustomerId && restaurantId && (
+        <CustomerDetail
+          customerId={selectedCustomerId}
+          restaurantId={restaurantId}
+          onClose={() => setSelectedCustomerId(null)}
+        />
       )}
     </div>
   )

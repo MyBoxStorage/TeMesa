@@ -4,7 +4,16 @@ import type { ReservationStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { sendNotification } from '@/lib/notifications'
+import { createPixOrder } from '@/lib/pagarme'
 import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt } from '@/lib/reservationRules'
+
+export interface PrepaymentInfo {
+  amountCents: number
+  pixCode: string
+  pixQrCodeUrl: string
+  expiresAt: Date
+  prepaymentRecordId: string
+}
 
 export async function getWidgetAvailability(params: { slug: string; date: string; partySize: number }) {
   const restaurant = await prisma.restaurant.findUnique({ where: { slug: params.slug }, select: { id: true } })
@@ -60,17 +69,15 @@ export async function createWidgetReservation(params: {
   occasion?: string
   dietaryNotes?: string
   lgpdConsent: boolean
-}) {
+}): Promise<{ reservationId: string; status: ReservationStatus; prepayment?: PrepaymentInfo }> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.slug },
-    select: { id: true, prepaymentConfig: true },
+    select: { id: true, name: true, prepaymentConfig: true },
   })
   if (!restaurant) throw new TRPCError({ code: 'NOT_FOUND' })
 
-  const prepaymentActive =
-    restaurant.prepaymentConfig != null &&
-    typeof restaurant.prepaymentConfig === 'object' &&
-    (restaurant.prepaymentConfig as Record<string, unknown>).prepayment_enabled === true
+  const cfg = restaurant.prepaymentConfig as Record<string, unknown> | null
+  const prepaymentActive = cfg?.prepayment_enabled === true
   const initialStatus: ReservationStatus = prepaymentActive ? 'PENDING_PAYMENT' : 'CONFIRMED'
 
   const start = new Date(params.date)
@@ -138,5 +145,62 @@ export async function createWidgetReservation(params: {
   })
 
   await sendNotification({ restaurantId: reservation.restaurantId, trigger: 'RESERVATION_CREATED', reservation })
-  return reservation
+
+  // If prepayment is active, create a Pix order via Pagar.me
+  if (prepaymentActive && cfg) {
+    const type = String(cfg.prepayment_type ?? 'VALOR_FIXO')
+    const amount = Number(cfg.prepayment_amount ?? 0)
+    let amountCents = 0
+    if (type === 'POR_PESSOA') amountCents = Math.round(amount * params.partySize * 100)
+    else if (type === 'PERCENTUAL') amountCents = Math.round(amount)
+    else amountCents = Math.round(amount * 100)
+
+    const expirationMinutes = Number(cfg.prepayment_expiry_minutes ?? 30)
+    const pixExpiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000)
+
+    try {
+      const pix = await createPixOrder({
+        amountCents,
+        expiresAt: pixExpiresAt,
+        customer: { name: params.guestName, email: params.guestEmail, phone: params.guestPhone },
+        description: `Sinal reserva ${restaurant.name}`,
+        metadata: { reservationId: reservation.id, restaurantId: restaurant.id },
+      })
+
+      const record = await prisma.prepaymentRecord.create({
+        data: {
+          reservationId: reservation.id,
+          amountCents,
+          status: 'PENDING',
+          pixCode: pix.pixCode,
+          pixQrCodeUrl: pix.pixQrCodeUrl,
+          pagarmeOrderId: pix.orderId,
+          expiresAt: pix.expiresAt,
+        },
+      })
+
+      return {
+        reservationId: reservation.id,
+        status: reservation.status,
+        prepayment: {
+          amountCents,
+          pixCode: pix.pixCode,
+          pixQrCodeUrl: pix.pixQrCodeUrl,
+          expiresAt: pix.expiresAt,
+          prepaymentRecordId: record.id,
+        },
+      }
+    } catch (err) {
+      // Pagar.me failure: cancel reservation and propagate error
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { status: 'CANCELLED', statusHistory: {
+          create: { fromStatus: 'PENDING_PAYMENT', toStatus: 'CANCELLED', changedBy: 'SYSTEM', reason: 'PAYMENT_SETUP_FAILED' },
+        }},
+      })
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Erro ao gerar Pix. Tente novamente.' })
+    }
+  }
+
+  return { reservationId: reservation.id, status: reservation.status }
 }

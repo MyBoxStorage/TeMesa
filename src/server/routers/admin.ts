@@ -219,4 +219,16 @@ export const adminRouter = router({
       where: { email: ctx.user.email, status: 'PENDING', expiresAt: { gt: new Date() } },
     })
   }),
+
+  // ── Mark the invite as used after onboarding restaurant creation ──────────
+  markMyInviteUsed: protectedProcedure.mutation(async ({ ctx }) => {
+    const invite = await ctx.prisma.invitation.findFirst({
+      where: { email: ctx.user.email, status: 'PENDING', expiresAt: { gt: new Date() } },
+    })
+    if (!invite) return null
+    return ctx.prisma.invitation.update({
+      where: { id: invite.id },
+      data: { status: 'USED', usedAt: new Date() },
+    })
+  }),
 })

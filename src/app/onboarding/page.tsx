@@ -33,8 +33,14 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
 
+  const markInviteUsed = api.admin.markMyInviteUsed.useMutation()
+
   const createRestaurant = api.restaurant.create.useMutation({
-    onSuccess: () => { setStep(1); toast.success('Restaurante criado!') },
+    onSuccess: () => {
+      markInviteUsed.mutate()
+      setStep(1)
+      toast.success('Restaurante criado!')
+    },
     onError: (e) => toast.error(e.message),
   })
 

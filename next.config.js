@@ -29,6 +29,13 @@ const nextConfig = {
           { key: 'Content-Security-Policy', value: 'frame-ancestors *' },
         ],
       },
+      {
+        source: '/confirmar/:token*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
+          { key: 'Content-Security-Policy', value: 'frame-ancestors *' },
+        ],
+      },
     ]
   },
   images: {
