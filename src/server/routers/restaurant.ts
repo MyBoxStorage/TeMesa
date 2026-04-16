@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/prisma'
@@ -19,6 +20,14 @@ export const restaurantRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.restaurant.findUnique({ where: { slug: input.slug } })
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `O slug "${input.slug}" já está em uso. Escolha outro.`,
+        })
+      }
+
       const restaurant = await ctx.prisma.restaurant.create({
         data: {
           name: input.name,

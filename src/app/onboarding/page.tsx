@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronRight, UtensilsCrossed, LayoutGrid, Bell, Clock } from 'lucide-react'
@@ -33,31 +33,57 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
 
-  const markInviteUsed = api.admin.markMyInviteUsed.useMutation()
+  const [inviteToken, setInviteToken] = useState<string | null>(null)
+  const [inviteApplied, setInviteApplied] = useState(false)
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('pendingInviteToken') : null
+    if (token) setInviteToken(token)
+  }, [])
+
+  const { data: pendingInvite } = api.admin.getInviteByToken.useQuery(
+    { token: inviteToken! },
+    { enabled: !!inviteToken, retry: false }
+  )
+
+  const markInviteUsedByToken = api.admin.markInviteUsedByToken.useMutation({
+    onSuccess: () => {
+      if (typeof window !== 'undefined') sessionStorage.removeItem('pendingInviteToken')
+    },
+    onError: (e) => console.error('[Onboarding] Falha ao marcar convite como usado:', e.message),
+  })
 
   const createRestaurant = api.restaurant.create.useMutation({
     onSuccess: () => {
-      markInviteUsed.mutate()
+      if (inviteToken) markInviteUsedByToken.mutate({ token: inviteToken })
       setStep(1)
       toast.success('Restaurante criado!')
     },
     onError: (e) => toast.error(e.message),
   })
 
-  // Auto-detect pending invite by email and pre-fill restaurant name
-  const { data: pendingInvite } = api.admin.getMyPendingInvite.useQuery(undefined, {
-    retry: false,
-  })
-
   const form0 = useForm({ resolver: zodResolver(schema0), defaultValues: { name: '', phone: '', slug: '' } })
 
-  // Pre-fill form when invite is found
-  const [inviteApplied, setInviteApplied] = useState(false)
-  if (pendingInvite && !inviteApplied) {
+  const pendingInviteValid = Boolean(
+    pendingInvite &&
+    pendingInvite.status === 'PENDING' &&
+    pendingInvite.expiresAt > new Date()
+  )
+
+  useEffect(() => {
+    if (!pendingInvite || inviteApplied) return
+    if (pendingInvite.status !== 'PENDING' || pendingInvite.expiresAt <= new Date()) return
+    const slug = pendingInvite.restaurantName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
     form0.setValue('name', pendingInvite.restaurantName)
-    form0.setValue('slug', pendingInvite.restaurantName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''))
+    form0.setValue('slug', slug)
     setInviteApplied(true)
-  }
+  }, [pendingInvite, inviteApplied, form0])
 
   const handleFinish = () => {
     setDone(true)
@@ -132,7 +158,7 @@ export default function OnboardingPage() {
           </div>
 
           {/* Invite banner */}
-          {pendingInvite && step === 0 && (
+          {pendingInviteValid && step === 0 && pendingInvite && (
             <div className="mb-4 px-3 py-2.5 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-2">
               <span className="text-green-400 text-sm">✅</span>
               <p className="text-[12px] text-green-300">

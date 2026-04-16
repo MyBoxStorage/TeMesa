@@ -19,14 +19,22 @@ export default function ConvitesAdminPage() {
   const utils = api.useUtils()
   const [form, setForm] = useState({ email: '', restaurantName: '', notes: '' })
   const [showForm, setShowForm] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'USED' | 'EXPIRED' | 'REVOKED'>('ALL')
 
-  const { data: invitations, isLoading } = api.admin.listInvitations.useQuery()
+  const { data, isLoading } = api.admin.listInvitations.useQuery({ status: statusFilter })
+  const invitations = data?.items ?? []
 
   const create = api.admin.createInvitation.useMutation({
-    onSuccess: () => {
+    onSuccess: (inv) => {
       utils.admin.listInvitations.invalidate()
       utils.admin.getStats.invalidate()
-      toast.success('Convite criado e e-mail enviado!')
+      if (inv.emailSent) {
+        toast.success('Convite criado e e-mail enviado!')
+      } else {
+        toast.warning('Convite criado, mas o e-mail não pôde ser enviado. Copie o link manualmente.', {
+          duration: 6000,
+        })
+      }
       setForm({ email: '', restaurantName: '', notes: '' })
       setShowForm(false)
     },
@@ -39,7 +47,16 @@ export default function ConvitesAdminPage() {
   })
 
   const resend = api.admin.resendInvitation.useMutation({
-    onSuccess: () => { utils.admin.listInvitations.invalidate(); toast.success('Convite reenviado') },
+    onSuccess: (inv) => {
+      utils.admin.listInvitations.invalidate()
+      if (inv.emailSent) {
+        toast.success('Convite reenviado e e-mail enviado!')
+      } else {
+        toast.warning('Convite atualizado, mas o e-mail não pôde ser enviado. Copie o link manualmente.', {
+          duration: 6000,
+        })
+      }
+    },
     onError: (e) => toast.error(e.message),
   })
 
@@ -119,6 +136,24 @@ export default function ConvitesAdminPage() {
         </div>
       )}
 
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {(['ALL', 'PENDING', 'USED', 'EXPIRED', 'REVOKED'] as const).map(s => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              'px-3 py-1 rounded-full text-[11px] font-medium transition-colors',
+              statusFilter === s
+                ? 'bg-white text-black'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white'
+            )}
+          >
+            {s === 'ALL' ? 'Todos' : STATUS_STYLE[s]?.label ?? s}
+          </button>
+        ))}
+      </div>
+
       {/* List */}
       {isLoading ? (
         <div className="space-y-3">
@@ -128,7 +163,7 @@ export default function ConvitesAdminPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(invitations ?? []).map((inv: { id: string; email: string; restaurantName: string; token: string; status: string; expiresAt: Date; usedAt: Date | null; notes: string | null; createdAt: Date }) => {
+          {invitations.map((inv: { id: string; email: string; restaurantName: string; token: string; status: string; expiresAt: Date; usedAt: Date | null; notes: string | null; createdAt: Date }) => {
             const isExpiredByDate = inv.expiresAt <= new Date()
             const effectiveStatus = isExpiredByDate && inv.status === 'PENDING' ? 'EXPIRED' : inv.status
             const style = STATUS_STYLE[effectiveStatus] ?? STATUS_STYLE.EXPIRED
@@ -205,7 +240,7 @@ export default function ConvitesAdminPage() {
             )
           })}
 
-          {invitations?.length === 0 && (
+          {invitations.length === 0 && (
             <div className="text-center py-16 text-zinc-600">
               <Mail className="w-8 h-8 mx-auto mb-3 opacity-40" />
               <p className="text-sm">Nenhum convite criado ainda.</p>

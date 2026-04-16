@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { UtensilsCrossed, Mail, Building2, Clock, ArrowRight } from 'lucide-react'
+import { InviteRedirectButtons } from '@/components/onboarding/invite-redirect-buttons'
 
 export default async function ConvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -90,14 +91,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
                 )}
 
                 <div className="space-y-2 pt-2">
-                  <Link href={`/sign-up?invite=${token}`}
-                    className="flex items-center justify-center gap-2 w-full bg-white text-black py-3 rounded-xl font-semibold text-sm">
-                    Criar conta e começar <ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <Link href={`/sign-in?invite=${token}`}
-                    className="flex items-center justify-center gap-2 w-full border border-zinc-700 text-zinc-300 py-3 rounded-xl text-sm hover:border-zinc-500 transition-colors">
-                    Já tenho conta — fazer login
-                  </Link>
+                  <InviteRedirectButtons token={token} />
                 </div>
 
                 <p className="text-xs text-zinc-600 text-center pt-2">
