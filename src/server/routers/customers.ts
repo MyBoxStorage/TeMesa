@@ -1,8 +1,18 @@
 import { z } from 'zod'
-import { Prisma, type Customer } from '@prisma/client'
+import { Prisma, type Customer, type Reservation } from '@prisma/client'
 
 import { sendBcEvent } from '@/lib/bcconnect'
 import { managerProcedure, ownerProcedure, staffProcedure, router } from '@/server/trpc'
+
+// DTO para serialização tRPC/superjson: `preferences` deixa de ser JsonValue (recursivo) e vira `unknown`,
+// o que evita inferência colapsar para `any` no cliente. Prisma continua retornando Customer; o tipo é estruturalmente atribuível.
+type CustomerDTO = Omit<Customer, 'preferences'> & {
+  preferences: unknown
+}
+
+type CustomerDetailDTO = CustomerDTO & {
+  reservations: Reservation[]
+}
 
 export const customersRouter = router({
   list: staffProcedure
@@ -13,7 +23,7 @@ export const customersRouter = router({
         tags: z.array(z.string()).optional(),
       })
     )
-    .query(async ({ ctx, input }): Promise<Customer[]> => {
+    .query(async ({ ctx, input }): Promise<CustomerDTO[]> => {
       return ctx.prisma.customer.findMany({
         where: {
           restaurantId: input.restaurantId,
@@ -34,7 +44,7 @@ export const customersRouter = router({
 
   getById: staffProcedure
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<CustomerDetailDTO | null> => {
       const customer = await ctx.prisma.customer.findFirst({
         where: { id: input.customerId, restaurantId: input.restaurantId },
         include: {
@@ -57,7 +67,7 @@ export const customersRouter = router({
         notes: z.string().nullable().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<CustomerDTO> => {
       const updated = await ctx.prisma.customer.update({
         where: { id: input.customerId, restaurantId: input.restaurantId },
         data: {
@@ -87,7 +97,7 @@ export const customersRouter = router({
 
   applyAutoTags: managerProcedure
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<CustomerDTO | null> => {
       const customer = await ctx.prisma.customer.findFirst({
         where: { id: input.customerId, restaurantId: input.restaurantId },
       })
@@ -123,7 +133,7 @@ export const customersRouter = router({
 
   deleteData: ownerProcedure
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<CustomerDTO> => {
       return ctx.prisma.customer.update({
         where: { id: input.customerId, restaurantId: input.restaurantId },
         data: {

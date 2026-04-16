@@ -11,6 +11,7 @@ import { api, type RouterOutputs } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { cn } from '@/lib/utils'
 
+// RouterOutputs infere CustomerDTO após o fix em customers.list (DTO sem JsonValue recursivo em preferences).
 type CustomerItem = RouterOutputs['customers']['list'][number]
 
 const AVATAR_COLORS = [
@@ -33,9 +34,7 @@ export default function ClientesPage() {
 
   const allTags: string[] = [
     ...new Set(
-      (customers?.flatMap((c: CustomerItem) => c.tags ?? []) ?? []).filter(
-        (t): t is string => typeof t === 'string',
-      ),
+      (customers?.flatMap((c: CustomerItem) => c.tags ?? []) ?? []).filter((t): t is string => typeof t === 'string'),
     ),
   ]
   const toggleTag = (tag: string) =>
@@ -86,7 +85,7 @@ export default function ClientesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {customers.map((customer: CustomerItem, idx: number) => {
-            const initials = customer.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+            const initials = (customer.name as string).split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
             const color = AVATAR_COLORS[customer.name.charCodeAt(0) % AVATAR_COLORS.length]
             const score = Math.round(customer.reliabilityScore)
             const scoreColor = score >= 90 ? 'text-green-400' : score >= 70 ? 'text-blue-400' : score >= 50 ? 'text-amber-400' : 'text-red-400'
@@ -123,7 +122,7 @@ export default function ClientesPage() {
                 </div>
                 {customer.tags && customer.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {customer.tags.slice(0, 3).map(tag => (
+                    {customer.tags.slice(0, 3).map((tag: string) => (
                       <Badge key={tag} variant="secondary" className="text-[9px] h-4 px-1.5 font-normal">{tag}</Badge>
                     ))}
                     {customer.tags.length > 3 && (
