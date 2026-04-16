@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Plus, QrCode, Clock, Users, X } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,11 @@ export default function WaitlistPage() {
   const [showQr, setShowQr]   = useState(false)
   const [addForm, setAddForm] = useState({ name: '', phone: '', partySize: 2 })
 
+  const { data: restaurantInfo } = api.restaurant.getPublicInfo.useQuery(
+    { restaurantId: restaurantId! },
+    { enabled: !!restaurantId }
+  )
+
   const { data: entries, isLoading } = api.waitlist.list.useQuery(
     { restaurantId: restaurantId!, date: today }, { enabled: !!restaurantId })
 
@@ -41,6 +47,9 @@ export default function WaitlistPage() {
   const done     = entries?.filter(e => ['CONFIRMED','DECLINED','EXPIRED'].includes(e.status)) ?? []
 
   if (!restaurantId) return null
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const waitlistUrl = `${baseUrl}/r/${restaurantInfo?.slug ?? ''}?waitlist=1`
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -139,11 +148,11 @@ export default function WaitlistPage() {
               <button onClick={() => setShowQr(false)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
             </div>
             <div className="bg-white rounded-xl p-4 flex items-center justify-center mb-3">
-              <QrCode className="w-32 h-32 text-black" />
+              <QRCodeSVG value={waitlistUrl} size={128} />
             </div>
             <p className="text-[12px] text-muted-foreground">Aponte a câmera para entrar na fila</p>
             <p className="text-[11px] text-muted-foreground/60 mt-1 font-mono break-all">
-              {typeof window !== 'undefined' ? window.location.origin : ''}/r/...?waitlist=1
+              {waitlistUrl}
             </p>
           </div>
         </div>

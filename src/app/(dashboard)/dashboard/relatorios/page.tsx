@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { Users, Calendar, AlertTriangle, BarChart3, Download } from 'lucide-react'
 import { api } from '@/trpc/react'
@@ -24,19 +25,20 @@ function exportCSV(rows: string[][], filename: string) {
 
 export default function RelatoriosPage() {
   const { restaurantId } = useDashboard()
+  const [period, setPeriod] = useState<'7' | '30' | '90'>('30')
 
   const { data: dashboard, isLoading } = api.analytics.getDashboard.useQuery(
     { restaurantId: restaurantId! }, { enabled: !!restaurantId })
   const { data: occupancy }    = api.analytics.getOccupancy30Days.useQuery(
-    { restaurantId: restaurantId! }, { enabled: !!restaurantId })
+    { restaurantId: restaurantId!, days: Number(period) }, { enabled: !!restaurantId })
   const { data: topCustomers } = api.analytics.getTopCustomers.useQuery(
     { restaurantId: restaurantId!, limit: 5 }, { enabled: !!restaurantId })
 
   const handleExportOcupacao = () => {
     if (!occupancy) return
     exportCSV(
-      [['Data', 'Pessoas'], ...occupancy.map(r => [r.date, String(r.covers)])],
-      'ocupacao-30dias.csv'
+      [['Data', 'Pessoas', 'Capacidade'], ...occupancy.map(r => [r.date, String(r.covers), String((r as any).capacity ?? 0)])],
+      `ocupacao-${period}dias.csv`
     )
   }
 
@@ -47,6 +49,28 @@ export default function RelatoriosPage() {
        ...topCustomers.map((c: any) => [c.name, c.phone, String(c.visitCount), String(c.noShowCount), String(Math.round(c.reliabilityScore))])],
       'top-clientes.csv'
     )
+  }
+
+  async function exportPDF() {
+    if (!occupancy?.length) return
+    const { jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF()
+    doc.setFontSize(16)
+    doc.text('Relatório de Ocupação', 14, 20)
+    doc.setFontSize(10)
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 28)
+    autoTable(doc, {
+      head: [['Data', 'Pessoas', 'Capacidade', 'Ocupação %']],
+      body: (occupancy ?? []).map((r: any) => [
+        r.date,
+        String(r.covers),
+        String(r.capacity),
+        r.capacity > 0 ? `${Math.round((r.covers / r.capacity) * 100)}%` : '—',
+      ]),
+      startY: 35,
+    })
+    doc.save('relatorio-ocupacao.pdf')
   }
 
   if (!restaurantId) return null
@@ -67,9 +91,14 @@ export default function RelatoriosPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[18px] font-semibold">Relatórios</h1>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={handleExportOcupacao} disabled={!occupancy?.length}>
-          <Download className="w-3.5 h-3.5" /> Exportar CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={handleExportOcupacao} disabled={!occupancy?.length}>
+            <Download className="w-3.5 h-3.5" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={exportPDF} disabled={!occupancy?.length}>
+            <Download className="w-3.5 h-3.5" /> PDF
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -92,7 +121,21 @@ export default function RelatoriosPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4">
-          <p className="text-[13px] font-medium mb-4">Ocupação — 30 dias</p>
+          <p className="text-[13px] font-medium mb-3">Ocupação</p>
+          <div className="flex gap-1 mb-4">
+            {(['7', '30', '90'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  'px-3 py-1 rounded-lg text-[11px] font-medium transition-colors',
+                  period === p ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {p} dias
+              </button>
+            ))}
+          </div>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={occupancy ?? []} barSize={8}>
               <XAxis dataKey="date" hide />

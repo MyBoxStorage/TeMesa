@@ -10,6 +10,7 @@ import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { NotificationTrigger } from '@prisma/client'
+import { DEFAULT_TEMPLATES } from '@/lib/notification-templates'
 
 const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
   RESERVATION_CREATED: 'Reserva criada',
@@ -30,6 +31,17 @@ export function ConfigNotificacoes({ restaurantId }: { restaurantId: string }) {
   const utils = api.useUtils()
   const updateTemplate = api.notifications.updateTemplate.useMutation({
     onSuccess: () => { utils.notifications.listTemplates.invalidate(); toast.success('Template salvo!') },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const toggleActive = api.notifications.updateTemplate.useMutation({
+    onSuccess: () => utils.notifications.listTemplates.invalidate(),
+    onError: (e) => toast.error(e.message),
+  })
+
+  const sendTest = api.notifications.sendTest.useMutation({
+    onSuccess: () => toast.success('Mensagem de teste enviada!'),
+    onError: (e) => toast.error(e.message),
   })
 
   return (
@@ -68,7 +80,16 @@ export function ConfigNotificacoes({ restaurantId }: { restaurantId: string }) {
                 <div className="flex items-center gap-3">
                   <Switch
                     checked={template?.isActive ?? true}
-                    onCheckedChange={() => {}}
+                    onCheckedChange={(checked) => {
+                      const defaultTemplate = DEFAULT_TEMPLATES[trigger]?.WHATSAPP ?? ''
+                      toggleActive.mutate({
+                        restaurantId,
+                        trigger,
+                        channel: 'WHATSAPP',
+                        templatePtBr: template?.templatePtBr ?? defaultTemplate,
+                        isActive: checked,
+                      })
+                    }}
                     className="data-[state=checked]:bg-green-500"
                     onClick={e => e.stopPropagation()}
                   />
@@ -97,6 +118,8 @@ export function ConfigNotificacoes({ restaurantId }: { restaurantId: string }) {
                               isActive: tmpl?.isActive ?? true,
                             })}
                             isSaving={updateTemplate.isPending}
+                            onTest={() => sendTest.mutate({ restaurantId, trigger, channel })}
+                            isTesting={sendTest.isPending}
                           />
                         </TabsContent>
                       )
@@ -112,8 +135,12 @@ export function ConfigNotificacoes({ restaurantId }: { restaurantId: string }) {
   )
 }
 
-function TemplateEditor({ value, onSave, isSaving }: {
-  value: string; onSave: (v: string) => void; isSaving: boolean
+function TemplateEditor({ value, onSave, isSaving, onTest, isTesting }: {
+  value: string
+  onSave: (v: string) => void
+  isSaving: boolean
+  onTest: () => void
+  isTesting: boolean
 }) {
   const [text, setText] = useState(value)
   return (
@@ -128,9 +155,15 @@ function TemplateEditor({ value, onSave, isSaving }: {
         <Button size="sm" className="h-7 text-[11px]" onClick={() => onSave(text)} disabled={isSaving}>
           {isSaving ? 'Salvando...' : 'Salvar'}
         </Button>
-        <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-[11px] gap-1.5"
+          onClick={onTest}
+          disabled={isTesting}
+        >
           <Send className="w-3 h-3" />
-          Testar
+          {isTesting ? 'Enviando...' : 'Testar'}
         </Button>
       </div>
     </div>

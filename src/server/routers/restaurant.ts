@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { encrypt } from '@/lib/crypto'
 import { DEFAULT_TEMPLATES } from '@/lib/notifications'
-import { protectedProcedure, ownerProcedure, router } from '@/server/trpc'
+import { protectedProcedure, ownerProcedure, router, staffProcedure } from '@/server/trpc'
 
 const addressSchema = z.record(z.string(), z.unknown())
 
@@ -185,5 +185,14 @@ export const restaurantRouter = router({
         select: { prepaymentConfig: true, plan: true },
       })
       return { config: r?.prepaymentConfig ?? null, plan: r?.plan ?? 'GRATUITO' }
+    }),
+
+  getPublicInfo: staffProcedure
+    .input(z.object({ restaurantId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.restaurant.findUnique({
+        where: { id: input.restaurantId },
+        select: { slug: true, name: true },
+      })
     }),
 })

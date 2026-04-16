@@ -72,22 +72,43 @@ export const analyticsRouter = router({
     }),
 
   getOccupancy30Days: staffProcedure
-    .input(z.object({ restaurantId: z.string() }))
+    .input(z.object({ restaurantId: z.string(), days: z.number().int().min(7).max(90).default(30) }))
     .query(async ({ ctx, input }) => {
       const now = new Date()
-      const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      const reservations = await ctx.prisma.reservation.findMany({
-        where: { restaurantId: input.restaurantId, date: { gte: start } },
-        select: { date: true, partySize: true },
-      })
+      const start = new Date(now.getTime() - input.days * 24 * 60 * 60 * 1000)
+
+      const [reservations, shifts] = await Promise.all([
+        ctx.prisma.reservation.findMany({
+          where: {
+            restaurantId: input.restaurantId,
+            date: { gte: start },
+            status: { in: ['CONFIRMED', 'CHECKED_IN', 'FINISHED'] as any },
+          },
+          select: { date: true, partySize: true },
+        }),
+        ctx.prisma.shift.findMany({
+          where: { restaurantId: input.restaurantId, isActive: true },
+          select: { daysOfWeek: true, maxCapacity: true },
+        }),
+      ])
+
       const byDate = new Map<string, number>()
       for (const r of reservations) {
         const d = r.date.toISOString().slice(0, 10)
         byDate.set(d, (byDate.get(d) ?? 0) + r.partySize)
       }
-      return Array.from(byDate.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, covers]) => ({ date, covers, capacity: 0 }))
+
+      const result: Array<{ date: string; covers: number; capacity: number }> = []
+      for (let i = 0; i < input.days; i++) {
+        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000)
+        const dateStr = d.toISOString().slice(0, 10)
+        const dow = d.getUTCDay()
+        const capacity = shifts
+          .filter((s) => s.daysOfWeek.includes(dow))
+          .reduce((acc, s) => acc + (s.maxCapacity ?? 0), 0)
+        result.push({ date: dateStr, covers: byDate.get(dateStr) ?? 0, capacity })
+      }
+      return result
     }),
 
   getTopCustomers: staffProcedure

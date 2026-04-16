@@ -1,7 +1,7 @@
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
-import { sendWhatsApp } from '@/lib/zapi'
-import { DEFAULT_TEMPLATES } from '@/lib/notifications'
+import { sendNotification } from '@/lib/notifications'
 import { managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 export const notificationsRouter = router({
@@ -74,31 +74,23 @@ export const notificationsRouter = router({
           'POST_VISIT',
           'CANCELLED',
         ]),
-        phone: z.string().min(8),
+        channel: z.enum(['WHATSAPP', 'EMAIL']),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const template =
-        (DEFAULT_TEMPLATES as any)[input.trigger]?.WHATSAPP ??
-        'Teste TeMesa para {{restaurantName}} (trigger: {{trigger}})'
-      const restaurant = await ctx.prisma.restaurant.findUnique({
-        where: { id: input.restaurantId },
-        select: { name: true },
+      const reservation = await ctx.prisma.reservation.findFirst({
+        where: { restaurantId: input.restaurantId },
+        include: { restaurant: true, customer: true },
+        orderBy: { createdAt: 'desc' },
       })
-      const msg = String(template)
-        .replaceAll('{{guestName}}', 'Cliente Teste')
-        .replaceAll('{{restaurantName}}', restaurant?.name ?? 'Restaurante')
-        .replaceAll('{{date}}', '01/01/2026')
-        .replaceAll('{{time}}', '19:00')
-        .replaceAll('{{partySize}}', '2')
-        .replaceAll('{{shiftName}}', 'Jantar')
-        .replaceAll('{{tableArea}}', 'Salão')
-        .replaceAll('{{confirmUrl}}', 'https://example.com/confirm')
-        .replaceAll('{{cancelUrl}}', 'https://example.com/cancel')
-        .replaceAll('{{reviewUrl}}', 'https://example.com/review')
-        .replaceAll('{{trigger}}', input.trigger)
-
-      await sendWhatsApp(input.phone, msg)
+      if (!reservation) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Nenhuma reserva encontrada para teste' })
+      }
+      await sendNotification({
+        restaurantId: input.restaurantId,
+        trigger: input.trigger as any,
+        reservation,
+      })
       return { ok: true }
     }),
 })

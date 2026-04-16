@@ -19,7 +19,124 @@ interface Restaurant {
 
 const GUEST_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8]
 
+const TRANSLATIONS = {
+  PT: {
+    onlineReservations: 'Reservas online',
+    guests: 'Quantas pessoas?',
+    date: 'Qual data?',
+    today: 'Hoje',
+    tomorrow: 'Amanhã',
+    seeSlots: 'Ver horários disponíveis →',
+    chooseTime: 'Escolha um horário',
+    noAvailability: 'Sem disponibilidade',
+    tryOther: 'Tente outra data ou número de pessoas',
+    changeConfig: 'Alterar data ou pessoas',
+    yourData: 'Seus dados',
+    namePlaceholder: 'Seu nome completo *',
+    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    emailPlaceholder: 'E-mail (opcional)',
+    occasionPlaceholder: 'Ocasião especial? (opcional)',
+    dietaryPlaceholder: 'Restrições alimentares (opcional)',
+    confirm: 'Confirmar reserva',
+    confirming: 'Confirmando...',
+    success: 'Reserva confirmada! 🎉',
+    lgpd: 'Li e aceito os Termos de Uso e a Política de Privacidade de',
+    required: '*',
+    enterName: 'Informe seu nome',
+    enterPhone: 'Informe seu WhatsApp',
+    acceptTerms: 'Aceite os termos para continuar',
+    payDeposit: 'Pague o sinal para confirmar',
+    pixExpiresAt: 'Pix • Expira às',
+    pixCopyAndPaste: 'Pix copia e cola',
+    copied: 'Copiado!',
+    copyPix: 'Copiar código Pix',
+    waitingPayment: 'Aguardando confirmação do pagamento...',
+    youWillReceiveWhatsApp: 'Você receberá uma confirmação no WhatsApp.',
+    makeAnother: 'Fazer outra reserva',
+    contactForLargerGroups: 'Para grupos maiores, entre em contato diretamente.',
+    otherDate: 'Outra data:',
+    poweredBy: 'Powered by TeMesa',
+  },
+  EN: {
+    onlineReservations: 'Online reservations',
+    guests: 'How many guests?',
+    date: 'Which date?',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    seeSlots: 'See available times →',
+    chooseTime: 'Choose a time',
+    noAvailability: 'No availability',
+    tryOther: 'Try a different date or party size',
+    changeConfig: 'Change date or guests',
+    yourData: 'Your details',
+    namePlaceholder: 'Your full name *',
+    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    emailPlaceholder: 'Email (optional)',
+    occasionPlaceholder: 'Special occasion? (optional)',
+    dietaryPlaceholder: 'Dietary restrictions (optional)',
+    confirm: 'Confirm reservation',
+    confirming: 'Confirming...',
+    success: 'Reservation confirmed! 🎉',
+    lgpd: 'I have read and accept the Terms of Use and Privacy Policy of',
+    required: '*',
+    enterName: 'Please enter your name',
+    enterPhone: 'Please enter your WhatsApp',
+    acceptTerms: 'Accept the terms to continue',
+    payDeposit: 'Pay the deposit to confirm',
+    pixExpiresAt: 'Pix • Expires at',
+    pixCopyAndPaste: 'Pix copy and paste',
+    copied: 'Copied!',
+    copyPix: 'Copy Pix code',
+    waitingPayment: 'Waiting for payment confirmation...',
+    youWillReceiveWhatsApp: 'You will receive a confirmation on WhatsApp.',
+    makeAnother: 'Make another reservation',
+    contactForLargerGroups: 'For larger groups, please contact us directly.',
+    otherDate: 'Other date:',
+    poweredBy: 'Powered by TeMesa',
+  },
+  ES: {
+    onlineReservations: 'Reservas online',
+    guests: '¿Cuántas personas?',
+    date: '¿Qué fecha?',
+    today: 'Hoy',
+    tomorrow: 'Mañana',
+    seeSlots: 'Ver horarios disponibles →',
+    chooseTime: 'Elige un horario',
+    noAvailability: 'Sin disponibilidad',
+    tryOther: 'Prueba otra fecha o número de personas',
+    changeConfig: 'Cambiar fecha o personas',
+    yourData: 'Tus datos',
+    namePlaceholder: 'Tu nombre completo *',
+    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    emailPlaceholder: 'Correo electrónico (opcional)',
+    occasionPlaceholder: '¿Ocasión especial? (opcional)',
+    dietaryPlaceholder: 'Restricciones alimentarias (opcional)',
+    confirm: 'Confirmar reserva',
+    confirming: 'Confirmando...',
+    success: '¡Reserva confirmada! 🎉',
+    lgpd: 'He leído y acepto los Términos de Uso y la Política de Privacidad de',
+    required: '*',
+    enterName: 'Ingresa tu nombre',
+    enterPhone: 'Ingresa tu WhatsApp',
+    acceptTerms: 'Acepta los términos para continuar',
+    payDeposit: 'Paga el depósito para confirmar',
+    pixExpiresAt: 'Pix • Expira a las',
+    pixCopyAndPaste: 'Pix copia y pega',
+    copied: '¡Copiado!',
+    copyPix: 'Copiar código Pix',
+    waitingPayment: 'Esperando confirmación del pago...',
+    youWillReceiveWhatsApp: 'Recibirás una confirmación por WhatsApp.',
+    makeAnother: 'Hacer otra reserva',
+    contactForLargerGroups: 'Para grupos más grandes, contáctanos directamente.',
+    otherDate: 'Otra fecha:',
+    poweredBy: 'Powered by TeMesa',
+  },
+} as const
+
+type Lang = keyof typeof TRANSLATIONS
+
 export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
+  const [lang, setLang]               = useState<Lang>('PT')
   const [step, setStep]               = useState<Step>('config')
   const [guests, setGuests]           = useState(2)
   const [date, setDate]               = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -28,6 +145,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   const [form, setForm]               = useState({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' })
   const [pixData, setPixData]         = useState<{ pixCode: string; pixQrCodeUrl: string; amountCents: number; expiresAt: Date; prepaymentRecordId: string } | null>(null)
   const [copied, setCopied]           = useState(false)
+  const t = TRANSLATIONS[lang]
 
   const primary = restaurant.themeConfig?.primaryColor ?? '#000000'
   const radius  = restaurant.themeConfig?.borderRadius  ?? '0.75rem'
@@ -70,9 +188,9 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   }, [pixData])
 
   const handleSubmit = () => {
-    if (!form.name.trim()) return toast.error('Informe seu nome')
-    if (!form.phone.trim()) return toast.error('Informe seu WhatsApp')
-    if (!lgpd) return toast.error('Aceite os termos para continuar')
+    if (!form.name.trim()) return toast.error(t.enterName)
+    if (!form.phone.trim()) return toast.error(t.enterPhone)
+    if (!lgpd) return toast.error(t.acceptTerms)
     const normalizeToE164 = (raw: string): string => {
       const digits = raw.replace(/\D/g, '')
       if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
@@ -98,8 +216,8 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   const tomorrow  = format(addDays(new Date(), 1), 'yyyy-MM-dd')
   const after     = format(addDays(new Date(), 2), 'yyyy-MM-dd')
   const quickDates = [
-    { value: today,    label: 'Hoje',     sub: format(new Date(), 'EEE', { locale: ptBR }) },
-    { value: tomorrow, label: 'Amanhã',   sub: format(addDays(new Date(), 1), 'EEE', { locale: ptBR }) },
+    { value: today,    label: t.today,     sub: format(new Date(), 'EEE', { locale: ptBR }) },
+    { value: tomorrow, label: t.tomorrow,  sub: format(addDays(new Date(), 1), 'EEE', { locale: ptBR }) },
     { value: after,    label: format(addDays(new Date(), 2), 'dd MMM', { locale: ptBR }), sub: format(addDays(new Date(), 2), 'EEE', { locale: ptBR }) },
   ]
 
@@ -119,7 +237,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
             )
           }
           <h1 className="text-base font-semibold text-white tracking-widest uppercase">{restaurant.name}</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Reservas online</p>
+          <p className="text-xs text-zinc-500 mt-0.5">{t.onlineReservations}</p>
         </div>
 
         <AnimatePresence mode="wait">
@@ -133,7 +251,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                 <div className="p-5 border-b border-zinc-800">
                   <div className="flex items-center gap-2 mb-3">
                     <Users className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">Quantas pessoas?</span>
+                    <span className="text-sm font-medium text-white">{t.guests}</span>
                   </div>
                   <div className="grid grid-cols-8 gap-1.5">
                     {GUEST_OPTIONS.map(n => (
@@ -153,7 +271,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     ))}
                   </div>
                   {guests === 8 && (
-                    <p className="text-xs text-zinc-500 mt-2 text-center">Para grupos maiores, entre em contato diretamente.</p>
+                    <p className="text-xs text-zinc-500 mt-2 text-center">{t.contactForLargerGroups}</p>
                   )}
                 </div>
 
@@ -161,7 +279,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                 <div className="p-5 border-b border-zinc-800">
                   <div className="flex items-center gap-2 mb-3">
                     <Calendar className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">Qual data?</span>
+                    <span className="text-sm font-medium text-white">{t.date}</span>
                   </div>
                   {/* Quick select */}
                   <div className="grid grid-cols-3 gap-2 mb-3">
@@ -182,9 +300,9 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                       </button>
                     ))}
                   </div>
-                  {/* Outra data */}
+                  {/* Other date */}
                   <label className="flex items-center gap-2 cursor-pointer group">
-                    <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors whitespace-nowrap">Outra data:</span>
+                    <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors whitespace-nowrap">{t.otherDate}</span>
                     <input
                       type="date"
                       value={date}
@@ -202,10 +320,10 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] shadow-lg"
                     style={{ backgroundColor: primary, borderRadius: radius }}
                   >
-                    Ver horários disponíveis →
+                    {t.seeSlots}
                   </button>
                   <p className="text-center text-[11px] text-zinc-600 mt-3">
-                    {guests} pessoa{guests > 1 ? 's' : ''} · {date === today ? 'Hoje' : date === tomorrow ? 'Amanhã' : format(new Date(date + 'T12:00'), "dd 'de' MMM", { locale: ptBR })}
+                    {guests} pessoa{guests > 1 ? 's' : ''} · {date === today ? t.today : date === tomorrow ? t.tomorrow : format(new Date(date + 'T12:00'), "dd 'de' MMM", { locale: ptBR })}
                   </p>
                 </div>
               </div>
@@ -223,7 +341,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   </button>
                   <div className="flex-1 text-center">
                     <p className="text-sm font-semibold text-white">
-                      {date === today ? 'Hoje' : date === tomorrow ? 'Amanhã' : format(new Date(date + 'T12:00'), "EEE, dd 'de' MMM", { locale: ptBR })}
+                      {date === today ? t.today : date === tomorrow ? t.tomorrow : format(new Date(date + 'T12:00'), "EEE, dd 'de' MMM", { locale: ptBR })}
                     </p>
                     <p className="text-xs text-zinc-500">{guests} pessoa{guests > 1 ? 's' : ''}</p>
                   </div>
@@ -233,7 +351,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-4">
                     <Clock className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">Escolha um horário</span>
+                    <span className="text-sm font-medium text-white">{t.chooseTime}</span>
                   </div>
 
                   {slotsLoading ? (
@@ -245,13 +363,13 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                       <AlertCircle className="w-8 h-8 text-zinc-600 mx-auto" />
                       <div>
                         <p className="text-sm text-zinc-400 font-medium">Sem disponibilidade</p>
-                        <p className="text-xs text-zinc-600 mt-1">Tente outra data ou número de pessoas</p>
+                        <p className="text-xs text-zinc-600 mt-1">{t.tryOther}</p>
                       </div>
                       <button
                         onClick={() => setStep('config')}
                         className="text-xs underline text-zinc-500 hover:text-zinc-300"
                       >
-                        Alterar data ou pessoas
+                        {t.changeConfig}
                       </button>
                     </div>
                   ) : (
@@ -301,25 +419,25 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                 </div>
 
                 <div className="p-5 space-y-3">
-                  <p className="text-sm font-semibold text-white mb-1">Seus dados</p>
+                  <p className="text-sm font-semibold text-white mb-1">{t.yourData}</p>
 
                   <input
                     type="text"
-                    placeholder="Seu nome completo *"
+                    placeholder={t.namePlaceholder}
                     value={form.name}
                     onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors"
                   />
                   <input
                     type="tel"
-                    placeholder="WhatsApp: (00) 00000-0000 *"
+                    placeholder={t.phonePlaceholder}
                     value={form.phone}
                     onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors"
                   />
                   <input
                     type="email"
-                    placeholder="E-mail (opcional)"
+                    placeholder={t.emailPlaceholder}
                     value={form.email}
                     onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors"
@@ -331,7 +449,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     onChange={e => setForm(p => ({ ...p, occasion: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-zinc-300 outline-none transition-colors appearance-none"
                   >
-                    <option value="">Ocasião especial? (opcional)</option>
+                    <option value="">{t.occasionPlaceholder}</option>
                     {['Aniversário 🎂', 'Lua de Mel 💍', 'Pedido de Casamento 💎', 'Formatura 🎓', 'Negócios 💼', 'Outro'].map(o => (
                       <option key={o} value={o}>{o}</option>
                     ))}
@@ -339,7 +457,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
                   <input
                     type="text"
-                    placeholder="Restrições alimentares (opcional)"
+                    placeholder={t.dietaryPlaceholder}
                     value={form.dietaryNotes}
                     onChange={e => setForm(p => ({ ...p, dietaryNotes: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors"
@@ -359,7 +477,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                         {lgpd && <span className="text-white text-[10px] font-bold">✓</span>}
                       </div>
                       <span className="text-xs text-zinc-400 leading-relaxed">
-                        Li e aceito os <span className="text-zinc-300 underline cursor-pointer">Termos de Uso</span> e a <span className="text-zinc-300 underline cursor-pointer">Política de Privacidade</span> de {restaurant.name}. <span className="text-red-400">*</span>
+                        {t.lgpd}{' '}{restaurant.name}. <span className="text-red-400">{t.required}</span>
                       </span>
                     </label>
 
@@ -372,8 +490,8 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     style={{ backgroundColor: primary, borderRadius: radius }}
                   >
                     {create.isPending
-                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Confirmando...</span>
-                      : 'Confirmar reserva'}
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {t.confirming}</span>
+                      : t.confirm}
                   </button>
                 </div>
               </div>
@@ -385,11 +503,11 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
             <motion.div key="pix" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
               <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
                 <div className="p-5 border-b border-zinc-800 text-center">
-                  <p className="text-sm font-semibold text-white mb-0.5">Pague o sinal para confirmar</p>
+                  <p className="text-sm font-semibold text-white mb-0.5">{t.payDeposit}</p>
                   <p className="text-2xl font-bold" style={{ color: primary }}>
                     {(pixData.amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">Pix • Expira às {format(new Date(pixData.expiresAt), 'HH:mm')}</p>
+                  <p className="text-xs text-zinc-500 mt-1">{t.pixExpiresAt} {format(new Date(pixData.expiresAt), 'HH:mm')}</p>
                 </div>
 
                 <div className="p-5 space-y-4">
@@ -400,7 +518,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   )}
 
                   <div className="bg-zinc-800 rounded-xl p-3">
-                    <p className="text-[10px] text-zinc-500 mb-1.5 uppercase tracking-wider">Pix copia e cola</p>
+                    <p className="text-[10px] text-zinc-500 mb-1.5 uppercase tracking-wider">{t.pixCopyAndPaste}</p>
                     <p className="text-[11px] text-zinc-300 font-mono break-all leading-relaxed line-clamp-3">{pixData.pixCode}</p>
                   </div>
 
@@ -409,12 +527,12 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
                     style={{ backgroundColor: primary }}
                   >
-                    {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> Copiar código Pix</>}
+                    {copied ? <><Check className="w-4 h-4" /> {t.copied}</> : <><Copy className="w-4 h-4" /> {t.copyPix}</>}
                   </button>
 
                   <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Aguardando confirmação do pagamento...
+                    {t.waitingPayment}
                   </div>
                 </div>
               </div>
@@ -434,7 +552,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   <CheckCircle2 className="w-8 h-8" style={{ color: primary }} />
                 </motion.div>
                 <div>
-                  <p className="text-lg font-bold text-white mb-1">Reserva confirmada! 🎉</p>
+                  <p className="text-lg font-bold text-white mb-1">{t.success}</p>
                   <p className="text-sm text-zinc-400">
                     Olá {form.name.split(' ')[0]}! Sua reserva no <strong className="text-white">{restaurant.name}</strong> está confirmada.
                   </p>
@@ -443,13 +561,13 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     <p className="text-xs text-zinc-300">⏰ {selectedSlot?.startTime} (± 2h)</p>
                     <p className="text-xs text-zinc-300">👥 {guests} pessoa{guests > 1 ? 's' : ''}</p>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-3">Você receberá uma confirmação no WhatsApp.</p>
+                  <p className="text-xs text-zinc-500 mt-3">{t.youWillReceiveWhatsApp}</p>
                 </div>
                 <button
                   onClick={() => { setStep('config'); setSelectedSlot(null); setForm({ name: '', phone: '', email: '', occasion: '', dietaryNotes: '' }); setLgpd(false); setPixData(null) }}
                   className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors"
                 >
-                  Fazer outra reserva
+                  {t.makeAnother}
                 </button>
               </div>
             </motion.div>
@@ -462,14 +580,15 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
           {(['PT', 'EN', 'ES'] as const).map(l => (
             <button
               key={l}
-              className={cn('text-[10px] font-medium transition-colors', l === 'PT' ? 'text-zinc-400' : 'text-zinc-600 hover:text-zinc-400')}
+              onClick={() => setLang(l as Lang)}
+              className={cn('text-[10px] font-medium transition-colors', l === lang ? 'text-zinc-400' : 'text-zinc-600 hover:text-zinc-400')}
               title={l === 'PT' ? 'Português' : l === 'EN' ? 'English' : 'Español'}
             >
               {l}
             </button>
           ))}
         </div>
-        <p className="text-center text-[10px] text-zinc-700 mt-2">Powered by TeMesa</p>
+        <p className="text-center text-[10px] text-zinc-700 mt-2">{t.poweredBy}</p>
       </div>
     </div>
   )

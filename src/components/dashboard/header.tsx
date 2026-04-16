@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Sun, Moon, Bell, ChevronDown } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { ChevronLeft, ChevronRight, Bell, ChevronDown } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,7 +43,6 @@ export function DashboardHeader({
   date, onDateChange, shift, onShiftChange,
   shifts = [], restaurants = [], selectedRestaurantId, onRestaurantChange,
 }: DashboardHeaderProps) {
-  const { theme, setTheme } = useTheme()
   const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
   const currentRestaurant = restaurants.find(r => r.id === selectedRestaurantId)
@@ -123,12 +121,6 @@ export function DashboardHeader({
 
       <div className="flex-1" />
 
-      <Button
-        size="icon" variant="ghost" className="h-7 w-7"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      >
-        {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-      </Button>
       <Button size="icon" variant="ghost" className="h-7 w-7 relative">
         <Bell className="w-3.5 h-3.5" />
       </Button>

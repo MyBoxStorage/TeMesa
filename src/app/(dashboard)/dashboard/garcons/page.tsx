@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Plus, LayoutGrid, UtensilsCrossed } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -8,11 +9,16 @@ import { EmptyState, SkeletonCard } from '@/components/common/empty-state'
 import { api } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { cn } from '@/lib/utils'
+import { ServerCreateModal } from '@/components/garcons/server-create-modal'
+import { ServerAssignModal } from '@/components/garcons/server-assign-modal'
 
 const PALETTE = ['#3b82f6','#22c55e','#f59e0b','#a855f7','#ef4444','#06b6d4','#ec4899']
 
 export default function GarconsPage() {
   const { restaurantId } = useDashboard()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [selectedServer, setSelectedServer] = useState<{ id: string; name: string } | null>(null)
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
 
@@ -32,10 +38,18 @@ export default function GarconsPage() {
           <h1 className="text-[18px] font-semibold">Garçons</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">Atribuição de mesas por turno</p>
         </div>
-        <Button size="sm" className="gap-2 h-8 text-[12px]">
+        <Button size="sm" className="gap-2 h-8 text-[12px]" onClick={() => setCreateOpen(true)}>
           <Plus className="w-3.5 h-3.5" />Novo Garçom
         </Button>
       </div>
+
+      <ServerCreateModal restaurantId={restaurantId} open={createOpen} onClose={() => setCreateOpen(false)} />
+      <ServerAssignModal
+        restaurantId={restaurantId}
+        server={selectedServer}
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -83,7 +97,15 @@ export default function GarconsPage() {
                       </div>
                     )}
                   </div>
-                  <Button variant="outline" size="sm" className="w-full mt-4 h-7 text-[11px] gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-4 h-7 text-[11px] gap-1.5"
+                    onClick={() => {
+                      setSelectedServer({ id: server.id, name: server.name })
+                      setAssignOpen(true)
+                    }}
+                  >
                     <LayoutGrid className="w-3 h-3" />Atribuir mesas
                   </Button>
                 </div>

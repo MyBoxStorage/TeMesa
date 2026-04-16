@@ -284,6 +284,32 @@ export const reservationsRouter = router({
         return res
       })
 
+      if (updated.customerId && (to === 'FINISHED' || to === 'NO_SHOW')) {
+        const autoTags = await ctx.prisma.autoTag.findMany({
+          where: { restaurantId: input.restaurantId, isActive: true },
+        })
+        const customer = await ctx.prisma.customer.findUnique({ where: { id: updated.customerId } })
+        if (customer && autoTags.length > 0) {
+          const next = new Set(customer.tags)
+          for (const t of autoTags) {
+            const conditions = (t.conditions as any) as Array<{ field: string; operator: string; value: any }>
+            const matched = conditions?.every((c) => {
+              const currentVal = (customer as any)[c.field]
+              if (c.field === 'tags' && c.operator === 'contains') {
+                return Array.isArray(customer.tags) && customer.tags.includes(String(c.value))
+              }
+              if (c.operator === 'gte') return Number(currentVal) >= Number(c.value)
+              if (c.operator === 'lte') return Number(currentVal) <= Number(c.value)
+              if (c.operator === 'eq') return String(currentVal) === String(c.value)
+              return false
+            })
+            if (matched) next.add(t.name)
+            else next.delete(t.name)
+          }
+          await ctx.prisma.customer.update({ where: { id: customer.id }, data: { tags: Array.from(next) } })
+        }
+      }
+
       if (to === 'CANCELLED') {
         await sendNotification({ restaurantId: updated.restaurantId, trigger: 'CANCELLED', reservation: updated })
       }
