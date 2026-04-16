@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/common/empty-state'
 import { ShiftForm } from '@/components/configuracoes/shift-form'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { toast } from 'sonner'
 import type { Shift } from '@prisma/client'
+
+type ShiftListItem = RouterOutputs['shifts']['list'][number]
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -70,7 +72,7 @@ export function ConfigTurnos({ restaurantId }: { restaurantId: string }) {
         />
       ) : (
         <div className="space-y-2">
-          {shifts?.map((shift) => (
+          {shifts?.map((shift: ShiftListItem) => (
             <div
               key={shift.id}
               className="flex items-center gap-4 p-4 bg-card border border-border rounded-xl"

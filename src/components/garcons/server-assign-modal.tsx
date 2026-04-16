@@ -5,8 +5,10 @@ import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { cn } from '@/lib/utils'
+
+type TableListItem = RouterOutputs['tables']['list'][number]
 
 export function ServerAssignModal(props: {
   restaurantId: string
@@ -76,7 +78,7 @@ export function ServerAssignModal(props: {
           ) : (tables?.length ?? 0) === 0 ? (
             <p className="text-[12px] text-muted-foreground">Nenhuma mesa cadastrada.</p>
           ) : (
-            tables?.map((t) => {
+            tables?.map((t: TableListItem) => {
               const checked = selectedTableIds.includes(t.id)
               return (
                 <label

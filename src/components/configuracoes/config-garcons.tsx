@@ -5,11 +5,11 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/common/empty-state'
+import { ServerCreateModal } from '@/components/garcons/server-create-modal'
 import { api, type RouterOutputs } from '@/trpc/react'
 import { toast } from 'sonner'
 
 type ServerItem = RouterOutputs['servers']['list'][number]
-import { ServerCreateModal } from '@/components/garcons/server-create-modal'
 
 export function ConfigGarcons({ restaurantId }: { restaurantId: string }) {
   const [createOpen, setCreateOpen] = useState(false)

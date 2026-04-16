@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { EmptyState } from '@/components/common/empty-state'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+type AutoTagListItem = RouterOutputs['autoTags']['list'][number]
 
 const OPERATORS: Record<string, string> = {
   gte: '≥', lte: '≤', eq: '=', contains: 'contém',
@@ -231,7 +233,7 @@ export function ConfigAutoTags({ restaurantId }: { restaurantId: string }) {
         />
       ) : (
         <div className="space-y-2">
-          {tags?.map(tag => {
+          {tags?.map((tag: AutoTagListItem) => {
             const conditions = tag.conditions as any[]
             return (
               <div key={tag.id} className="flex items-start gap-4 p-4 bg-card border border-border rounded-xl">

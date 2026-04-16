@@ -79,7 +79,7 @@ export default function ClientesPage() {
           description="Os clientes aparecem automaticamente quando fazem uma reserva." />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {customers.map((customer, idx) => {
+          {customers.map((customer: CustomerItem, idx: number) => {
             const initials = customer.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
             const color = AVATAR_COLORS[customer.name.charCodeAt(0) % AVATAR_COLORS.length]
             const score = Math.round(customer.reliabilityScore)

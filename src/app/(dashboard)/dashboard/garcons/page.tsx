@@ -6,9 +6,12 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, SkeletonCard } from '@/components/common/empty-state'
-import { api } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import { useDashboard } from '../layout'
 import { cn } from '@/lib/utils'
+
+type ServerItem = RouterOutputs['servers']['list'][number]
+type TableItem = RouterOutputs['tables']['list'][number]
 import { ServerCreateModal } from '@/components/garcons/server-create-modal'
 import { ServerAssignModal } from '@/components/garcons/server-assign-modal'
 
@@ -61,9 +64,9 @@ export default function GarconsPage() {
           action={<Button size="sm" variant="outline">Cadastrar garçom</Button>} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {servers?.map((server, idx) => {
+          {servers?.map((server: ServerItem, idx: number) => {
             const color = PALETTE[idx % PALETTE.length]
-            const serverTables = tables?.filter(t => (assignments as any)?.[t.id]?.server?.id === server.id) ?? []
+            const serverTables = tables?.filter((t: TableItem) => (assignments as any)?.[t.id]?.server?.id === server.id) ?? []
             return (
               <motion.div key={server.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
