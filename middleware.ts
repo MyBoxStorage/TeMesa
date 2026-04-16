@@ -1,33 +1,29 @@
-import { clerkMiddleware } from '@clerk/nextjs/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
+
+const isPublicRoute = createRouteMatcher([
+  '/r/(.*)',
+  '/confirmar/(.*)',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/convite(.*)',
+  '/onboarding(.*)',
+  '/api/trpc/(.*)',
+  '/api/widget/(.*)',
+  '/api/webhooks/(.*)',
+  '/api/cron/(.*)',
+])
 
 export default clerkMiddleware(async (auth, req) => {
-  // Only protect non-public routes. Public routes are excluded from matcher
-  // (so Clerk middleware doesn't run at all for /r/* and /confirmar/*).
-  const pathname = req.nextUrl.pathname
-  const isPublic =
-    pathname.startsWith('/r/') ||
-    pathname === '/r' ||
-    pathname.startsWith('/confirmar/') ||
-    pathname === '/confirmar' ||
-    pathname.startsWith('/sign-in') ||
-    pathname.startsWith('/sign-up') ||
-    pathname.startsWith('/convite') ||
-    pathname.startsWith('/onboarding') ||
-    pathname.startsWith('/api/trpc') ||
-    pathname.startsWith('/api/webhooks') ||
-    pathname.startsWith('/api/cron') ||
-    pathname.startsWith('/api/widget')
-
-  if (!isPublic) {
+  if (!isPublicRoute(req)) {
     await auth.protect()
   }
+  return NextResponse.next()
 })
 
 export const config = {
   matcher: [
-    // Exclude static files, Next internals, AND widget public routes.
-    '/((?!_next|r/|confirmar/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 
