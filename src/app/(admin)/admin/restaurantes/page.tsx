@@ -5,17 +5,16 @@ import { Building2, Users, Calendar, ToggleLeft, ToggleRight, ChevronDown, Searc
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { Prisma } from '@prisma/client'
-
-type RestaurantListItem = Prisma.RestaurantGetPayload<{
-  include: {
-    users: {
-      include: { user: { select: { id: true; name: true; email: true } } }
-      where: { role: 'OWNER' }
-    }
-    _count: { select: { reservations: true; customers: true } }
-  }
-}>
+type RestaurantListItem = {
+  id: string
+  name: string
+  slug: string
+  isActive: boolean
+  plan: string
+  createdAt: Date
+  users: Array<{ user: { id: string; name: string; email: string } }>
+  _count: { reservations: number; customers: number }
+}
 
 const PLANS = ['GRATUITO', 'ESSENCIAL', 'PROFISSIONAL', 'REDE', 'ENTERPRISE'] as const
 const PLAN_COLOR: Record<string, string> = {
