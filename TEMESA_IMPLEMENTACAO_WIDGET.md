@@ -33,7 +33,7 @@
 Site do restaurante
   └── <iframe> ou <a href> apontando para:
 
-TeMesa (https://unique-sfogliatella-a00c01.netlify.app)
+TeMesa (https://temesa.vercel.app)
   └── /r/[slug]                    ← Widget público de reservas
         ├── Passo 1: Pessoas + Data
         ├── Passo 2: Horários disponíveis (via tRPC → shifts.getAvailableSlots)
@@ -73,7 +73,7 @@ Stack:
 
 ### 3.1 Cadastro
 
-1. Acesse `https://unique-sfogliatella-a00c01.netlify.app/sign-up`
+1. Acesse `https://temesa.vercel.app/sign-up`
 2. Crie conta com e-mail e senha (ou Google)
 3. O sistema redireciona para `/onboarding`
 
@@ -87,7 +87,7 @@ Telefone WhatsApp:   [ex: +55 47 99999-9999]
 ```
 
 > **Slug:** use apenas letras minúsculas, números e hífens. Sem acentos.
-> Define a URL: `https://unique-sfogliatella-a00c01.netlify.app/r/[slug]`.
+> Define a URL: `https://temesa.vercel.app/r/[slug]`.
 
 ### 3.3 Passos 2, 3 e 4 do onboarding
 
@@ -191,14 +191,14 @@ Variáveis disponíveis nos templates:
 
 ### 8.1 URL do widget — Porto Cabral BC
 ```
-https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc
+https://temesa.vercel.app/r/porto-cabral-bc
 ```
 
 ### 8.2 Iframe (embed) — já integrado em portocabralatual
 ```html
 <div style="width: 100%; max-width: 480px; margin: 0 auto;">
   <iframe
-    src="https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc"
+    src="https://temesa.vercel.app/r/porto-cabral-bc"
     width="100%"
     height="700"
     frameborder="0"
@@ -214,7 +214,7 @@ https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc
 ### 8.3 Botão externo
 ```html
 <a
-  href="https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc"
+  href="https://temesa.vercel.app/r/porto-cabral-bc"
   target="_blank"
   rel="noopener noreferrer"
 >
@@ -368,7 +368,7 @@ Ao alterar qualquer variável de ambiente, sempre fazer um novo deploy.
 
 ```env
 # ── APLICAÇÃO ──────────────────────────────────────────────────────────────────
-NEXT_PUBLIC_APP_URL=https://unique-sfogliatella-a00c01.netlify.app
+NEXT_PUBLIC_APP_URL=https://temesa.vercel.app
 # NUNCA deixar como http://localhost:3000 em produção.
 
 # ── AUTENTICAÇÃO (Clerk) ──────────────────────────────────────────────────────
@@ -448,7 +448,7 @@ Configure no **cron-job.org** (gratuito).
 
 **Job 1 — Expirar reservas com pagamento pendente:**
 ```
-URL:        https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending
+URL:        https://temesa.vercel.app/api/cron/expire-pending
 Método:     GET
 Frequência: A cada 5 minutos
 Header:     Authorization: Bearer temesa_cron_secret_2026
@@ -456,7 +456,7 @@ Header:     Authorization: Bearer temesa_cron_secret_2026
 
 **Job 2 — Enviar lembretes (24h e 2h antes):**
 ```
-URL:        https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders
+URL:        https://temesa.vercel.app/api/cron/reminders
 Método:     GET
 Frequência: A cada hora (minuto 0)
 Header:     Authorization: Bearer temesa_cron_secret_2026
@@ -468,7 +468,7 @@ Header:     Authorization: Bearer temesa_cron_secret_2026
 
 ```
 □ 1. Abrir http://localhost:3000/r/porto-cabral-bc (dev) ou
-       https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc (prod)
+       https://temesa.vercel.app/r/porto-cabral-bc (prod)
 □ 2. Nome "Porto Cabral BC" e tema dourado (#C8A96E) aparecem
 □ 3. Selecionar 2 pessoas + data de hoje → botão "Ver horários disponíveis"
 □ 4. Turnos: Almoço / Happy Hour / Jantar aparecem conforme o dia
@@ -504,7 +504,7 @@ Requer `PAGARME_API_KEY` e `PAGARME_WEBHOOK_SECRET`.
 ### 15.2 Domínio personalizado no Netlify
 
 1. Netlify → **Domain management → Add domain**
-2. DNS do domínio: `reservas CNAME unique-sfogliatella-a00c01.netlify.app`
+2. DNS do domínio: `reservas CNAME temesa.vercel.app`
 3. Atualizar `NEXT_PUBLIC_APP_URL` e fazer redeploy
 
 ---
@@ -625,13 +625,13 @@ O arquivo correto está em `src/app/globals.css`.
 
 | Recurso | URL |
 |---|---|
-| Widget Porto Cabral BC | `https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc` |
-| Painel do operador | `https://unique-sfogliatella-a00c01.netlify.app/dashboard/reservas` |
-| Onboarding novo restaurante | `https://unique-sfogliatella-a00c01.netlify.app/onboarding` |
-| Confirmação pelo cliente | `https://unique-sfogliatella-a00c01.netlify.app/confirmar/[token]` |
-| Cancelamento pelo cliente | `https://unique-sfogliatella-a00c01.netlify.app/confirmar/[token]?action=cancel` |
-| Cron — expirar reservas | `https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending` |
-| Cron — lembretes | `https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders` |
+| Widget Porto Cabral BC | `https://temesa.vercel.app/r/porto-cabral-bc` |
+| Painel do operador | `https://temesa.vercel.app/dashboard/reservas` |
+| Onboarding novo restaurante | `https://temesa.vercel.app/onboarding` |
+| Confirmação pelo cliente | `https://temesa.vercel.app/confirmar/[token]` |
+| Cancelamento pelo cliente | `https://temesa.vercel.app/confirmar/[token]?action=cancel` |
+| Cron — expirar reservas | `https://temesa.vercel.app/api/cron/expire-pending` |
+| Cron — lembretes | `https://temesa.vercel.app/api/cron/reminders` |
 
 ---
 
@@ -663,4 +663,4 @@ O arquivo correto está em `src/app/globals.css`.
 ---
 
 *Documento atualizado em abril 2026.*
-*Sistema em desenvolvimento local. Deploy em `unique-sfogliatella-a00c01.netlify.app`.*
+*Sistema em desenvolvimento local. Deploy em `https://temesa.vercel.app`.*

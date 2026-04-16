@@ -113,13 +113,13 @@ GitHub → repositório TeMesa → Settings → Secrets and variables → Action
   Valor: temesa_cron_secret_2026
 
 ### PASSO 3 — Tornar-se admin em produção
-Após fazer login em https://unique-sfogliatella-a00c01.netlify.app/sign-up
+Após fazer login em https://temesa.vercel.app/sign-up
 com techgeniushq@gmail.com, executar no Supabase SQL Editor:
   UPDATE "User" SET "isAdmin" = true WHERE email = 'techgeniushq@gmail.com';
 
 ### PASSO 4 — Verificar widget no Porto Cabral
 O widget já está embebido em portocabralatual via TeMesaWidget.tsx.
-Aponta para: https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc
+Aponta para: https://temesa.vercel.app/r/porto-cabral-bc
 Após deploy do TeMesa, aparece automaticamente na seção de reservas.
 
 ---
@@ -128,13 +128,13 @@ Após deploy do TeMesa, aparece automaticamente na seção de reservas.
 
 | Recurso | URL |
 |---|---|
-| Widget Porto Cabral | https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc |
-| Dashboard operador | https://unique-sfogliatella-a00c01.netlify.app/dashboard/reservas |
-| Painel admin (só você) | https://unique-sfogliatella-a00c01.netlify.app/admin |
-| Onboarding parceiro | https://unique-sfogliatella-a00c01.netlify.app/onboarding |
-| Confirmar reserva | https://unique-sfogliatella-a00c01.netlify.app/confirmar/[token] |
-| Cron expire-pending | https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending |
-| Cron reminders | https://unique-sfogliatella-a00c01.netlify.app/api/cron/reminders |
+| Widget Porto Cabral | https://temesa.vercel.app/r/porto-cabral-bc |
+| Dashboard operador | https://temesa.vercel.app/dashboard/reservas |
+| Painel admin (só você) | https://temesa.vercel.app/admin |
+| Onboarding parceiro | https://temesa.vercel.app/onboarding |
+| Confirmar reserva | https://temesa.vercel.app/confirmar/[token] |
+| Cron expire-pending | https://temesa.vercel.app/api/cron/expire-pending |
+| Cron reminders | https://temesa.vercel.app/api/cron/reminders |
 
 ---
 

@@ -15,7 +15,7 @@ jobs:
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://unique-sfogliatella-a00c01.netlify.app/api/cron/expire-pending")
+            "https://temesa.vercel.app/api/cron/expire-pending")
           echo "HTTP status: $response"
           if [ "$response" != "200" ]; then
             echo "Erro: status $response"

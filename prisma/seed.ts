@@ -109,7 +109,7 @@ async function main() {
   console.log('──────────────────────────────────────────')
   console.log('🎉 Seed concluído!')
   console.log(`   Restaurante ID : ${restaurant.id}`)
-  console.log(`   Widget URL     : https://unique-sfogliatella-a00c01.netlify.app/r/porto-cabral-bc`)
+  console.log(`   Widget URL     : https://temesa.vercel.app/r/porto-cabral-bc`)
   console.log('──────────────────────────────────────────')
 }
 
