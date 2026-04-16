@@ -128,7 +128,7 @@ export default function ConvitesAdminPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(invitations ?? []).map(inv => {
+          {(invitations ?? []).map((inv: { id: string; email: string; restaurantName: string; token: string; status: string; expiresAt: Date; usedAt: Date | null; notes: string | null; createdAt: Date }) => {
             const isExpiredByDate = inv.expiresAt <= new Date()
             const effectiveStatus = isExpiredByDate && inv.status === 'PENDING' ? 'EXPIRED' : inv.status
             const style = STATUS_STYLE[effectiveStatus] ?? STATUS_STYLE.EXPIRED
