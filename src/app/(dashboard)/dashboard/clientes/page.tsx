@@ -31,7 +31,13 @@ export default function ClientesPage() {
     tags: selectedTags.length ? selectedTags : undefined,
   }, { enabled: !!restaurantId })
 
-  const allTags: string[] = [...new Set(customers?.flatMap((c: CustomerItem) => c.tags ?? []) ?? [])]
+  const allTags: string[] = [
+    ...new Set(
+      (customers?.flatMap((c: CustomerItem) => c.tags ?? []) ?? []).filter(
+        (t): t is string => typeof t === 'string',
+      ),
+    ),
+  ]
   const toggleTag = (tag: string) =>
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
 

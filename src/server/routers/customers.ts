@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
+import { Prisma, type Customer } from '@prisma/client'
 
 import { sendBcEvent } from '@/lib/bcconnect'
 import { managerProcedure, ownerProcedure, staffProcedure, router } from '@/server/trpc'
@@ -13,7 +13,7 @@ export const customersRouter = router({
         tags: z.array(z.string()).optional(),
       })
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<Customer[]> => {
       return ctx.prisma.customer.findMany({
         where: {
           restaurantId: input.restaurantId,
