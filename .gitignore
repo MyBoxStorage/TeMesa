@@ -18,6 +18,15 @@
 # Playwright saved auth (local only; may contain session cookies)
 /tests/fixtures/.auth/user.json
 
+# Documentos de prompt e notas internas (manter só local)
+/CURSOR_DESIGN_PROMPT.md
+/CURSOR_FEATURES_PROMPT.md
+/CURSOR_UX_PROMPT.md
+/PROMPT_AUDITORIA_NEGOCIOS.md
+/ROADMAP_FUTURO.md
+/TESTES_QA_COMPLETO.md
+/UX_UI_RECOMENDACOES.md
+
 # next.js
 /.next/
 /out/
