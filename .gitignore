@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+
+# Playwright saved auth (local only; may contain session cookies)
+/tests/fixtures/.auth/user.json
 
 # next.js
 /.next/
@@ -45,3 +50,4 @@ next-env.d.ts
 .netlify
 
 .vercel
+.env

@@ -12,13 +12,13 @@ export const DEFAULT_TEMPLATES: Record<
   },
   REMINDER_24H: {
     WHATSAPP:
-      '⏰ *Lembrete de reserva*\nOlá {{guestName}}! Sua reserva no *{{restaurantName}}* é amanhã.\n\n📅 {{date}} às {{time}} • {{partySize}} pessoas\n\nConfirme: {{confirmUrl}} | Cancelar: {{cancelUrl}}',
+      '⏰ *Lembrete de reserva*\nOlá {{guestName}}! Sua reserva no *{{restaurantName}}* é amanhã.\n\n📅 {{date}} às {{time}} • {{partySize}} pessoas\n\n✅ Responda *1* para CONFIRMAR\n❌ Responda *2* para CANCELAR\n\nOu acesse: {{confirmUrl}}',
     EMAIL:
       'Lembrete de reserva (24h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é amanhã.\n\nData: {{date}} {{time}}\nPessoas: {{partySize}}\nConfirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
   },
   REMINDER_2H: {
     WHATSAPP:
-      '🍽️ Olá {{guestName}}! Sua reserva no *{{restaurantName}}* é em 2 horas ({{time}}). Até logo! 😊',
+      '🍽️ Olá {{guestName}}! Sua reserva no *{{restaurantName}}* é em 2 horas ({{time}}).\n\n✅ Responda *1* para confirmar\n❌ Responda *2* para cancelar\n\nAté logo! 😊',
     EMAIL:
       'Lembrete de reserva (2h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é em 2 horas.\nHorário: {{time}}\n',
   },
@@ -36,7 +36,7 @@ export const DEFAULT_TEMPLATES: Record<
   },
   POST_VISIT: {
     WHATSAPP:
-      '🙏 Olá {{guestName}}, obrigado pela visita ao *{{restaurantName}}*! Como foi sua experiência?\n⭐ {{reviewUrl}}',
+      '🙏 Olá {{guestName}}, obrigado pela visita ao *{{restaurantName}}*!\n\nComo foi sua experiência?\n⭐ Deixe sua avaliação: {{reviewUrl}}\n\nSua opinião nos ajuda muito! 💛',
     EMAIL:
       'Obrigado pela visita!\n\nOlá {{guestName}}, obrigado pela visita ao {{restaurantName}}.\nAvaliar: {{reviewUrl}}\n',
   },

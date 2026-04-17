@@ -17,6 +17,7 @@ export const restaurantRouter = router({
         phone: z.string().min(8),
         address: addressSchema,
         cnpj: z.string().optional(),
+        businessType: z.enum(['bar', 'casual', 'fine_dining', 'lounge', 'cafe']).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -52,7 +53,106 @@ export const restaurantRouter = router({
 
       await ctx.prisma.notificationTemplate.createMany({ data: templateRows, skipDuplicates: true })
 
+      // Defaults inteligentes por tipo de estabelecimento
+      const defaults: Record<
+        string,
+        { shifts: Array<{ name: string; start: string; end: string; days: number[]; cap: number; dur: number }>; tables: number }
+      > = {
+        bar: {
+          shifts: [
+            { name: 'Happy Hour', start: '17:00', end: '20:00', days: [1, 2, 3, 4, 5], cap: 40, dur: 90 },
+            { name: 'Noite', start: '20:00', end: '01:00', days: [3, 4, 5, 6], cap: 60, dur: 120 },
+          ],
+          tables: 10,
+        },
+        casual: {
+          shifts: [
+            { name: 'Almoço', start: '12:00', end: '15:00', days: [0, 1, 2, 3, 4, 5, 6], cap: 80, dur: 90 },
+            { name: 'Jantar', start: '19:00', end: '23:00', days: [0, 1, 2, 3, 4, 5, 6], cap: 80, dur: 120 },
+          ],
+          tables: 15,
+        },
+        fine_dining: {
+          shifts: [
+            { name: 'Almoço', start: '12:00', end: '14:30', days: [2, 3, 4, 5, 6], cap: 40, dur: 120 },
+            { name: 'Jantar', start: '19:30', end: '23:00', days: [2, 3, 4, 5, 6], cap: 40, dur: 150 },
+          ],
+          tables: 12,
+        },
+        lounge: {
+          shifts: [{ name: 'Noite', start: '21:00', end: '03:00', days: [4, 5, 6], cap: 100, dur: 120 }],
+          tables: 20,
+        },
+        cafe: {
+          shifts: [
+            { name: 'Manhã', start: '08:00', end: '12:00', days: [0, 1, 2, 3, 4, 5, 6], cap: 30, dur: 60 },
+            { name: 'Tarde', start: '14:00', end: '18:00', days: [0, 1, 2, 3, 4, 5, 6], cap: 30, dur: 60 },
+          ],
+          tables: 8,
+        },
+      }
+
+      const preset = defaults[input.businessType ?? 'casual']
+      if (preset) {
+        for (const s of preset.shifts) {
+          await ctx.prisma.shift.create({
+            data: {
+              restaurantId: restaurant.id,
+              name: s.name,
+              startTime: s.start,
+              endTime: s.end,
+              daysOfWeek: s.days,
+              maxCapacity: s.cap,
+              turnDuration: s.dur,
+            },
+          })
+        }
+        for (let i = 1; i <= preset.tables; i++) {
+          await ctx.prisma.table.create({
+            data: {
+              restaurantId: restaurant.id,
+              name: `Mesa ${i}`,
+              capacity: 4,
+              minCapacity: 1,
+              area: 'Salão',
+              posX: (i % 5) * 120 + 60,
+              posY: Math.floor((i - 1) / 5) * 120 + 60,
+            },
+          })
+        }
+      }
+
       return restaurant
+    }),
+
+  getById: staffProcedure
+    .input(z.object({ restaurantId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.restaurant.findFirst({
+        where: { id: input.restaurantId },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          noShowProtectionAddon: true,
+          prepaymentConfig: true,
+          googlePlaceId: true,
+        },
+      })
+    }),
+
+  toggleNoShowProtection: protectedProcedure
+    .input(
+      z.object({
+        restaurantId: z.string(),
+        enabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.restaurant.update({
+        where: { id: input.restaurantId },
+        data: { noShowProtectionAddon: input.enabled },
+      })
     }),
 
   getMyRestaurant: protectedProcedure.query(async ({ ctx }) => {
@@ -82,6 +182,7 @@ export const restaurantRouter = router({
         address: addressSchema.optional(),
         cnpj: z.string().optional(),
         operatingHours: z.unknown().optional(),
+        googlePlaceId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -93,6 +194,7 @@ export const restaurantRouter = router({
           address: input.address as any,
           cnpj: input.cnpj,
           operatingHours: input.operatingHours as any,
+          googlePlaceId: input.googlePlaceId === undefined ? undefined : input.googlePlaceId,
         },
       })
     }),

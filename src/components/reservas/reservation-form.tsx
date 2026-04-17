@@ -1,6 +1,7 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
@@ -17,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
+import { AlertTriangle } from 'lucide-react'
 
 const schema = z.object({
   guestName:    z.string().min(2, 'Nome obrigatório'),
@@ -40,8 +42,15 @@ interface Props {
   restaurantId: string
 }
 
+function toE164Local(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
+  return `+55${digits}`
+}
+
 export function ReservationForm({ open, onClose, restaurantId }: Props) {
   const utils = api.useUtils()
+  const [noShowWarning, setNoShowWarning] = useState<{ name: string; count: number } | null>(null)
   const create = api.reservations.create.useMutation({
     onSuccess: () => {
       utils.reservations.list.invalidate()
@@ -68,6 +77,22 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
       lgpdConsent:  false,
     },
   })
+
+  const watchedPhone = useWatch({ control: form.control, name: 'guestPhone' })
+  const phoneE164Preview = watchedPhone ? toE164Local(watchedPhone) : ''
+
+  const checkCustomer = api.customers.findByPhone.useQuery(
+    { restaurantId, phone: phoneE164Preview },
+    { enabled: !!restaurantId && phoneE164Preview.length >= 13, retry: false }
+  )
+
+  useEffect(() => {
+    if (checkCustomer.data && checkCustomer.data.noShowCount >= 2) {
+      setNoShowWarning({ name: checkCustomer.data.name, count: checkCustomer.data.noShowCount })
+    } else {
+      setNoShowWarning(null)
+    }
+  }, [checkCustomer.data])
 
   const onSubmit = (values: FormValues) => {
     const dateTime = new Date(`${values.date}T${values.time}:00`)
@@ -223,6 +248,19 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
                 </FormLabel>
               </FormItem>
             )} />
+
+            {noShowWarning && (
+              <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-300">Cliente com histórico de no-show</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {noShowWarning.name} já não compareceu {noShowWarning.count} vez(es). Considere exigir confirmação
+                    prévia ou sinal Pix.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Submit */}
             <div className="flex gap-2 pt-2">

@@ -1,48 +1,26 @@
 'use client'
 
-import { useState, createContext, useContext, useEffect } from 'react'
-import { Sidebar } from '@/components/dashboard/sidebar'
+import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
+import { motion } from 'framer-motion'
+import { Sidebar, MobileBottomNav } from '@/components/dashboard/sidebar'
 import { DashboardHeader } from '@/components/dashboard/header'
 import { api } from '@/trpc/react'
-import type { StaffRole } from '@prisma/client'
+import { posthog } from '@/lib/posthog'
+import { getSupabaseAnonClient } from '@/lib/supabase'
+import { toast } from 'sonner'
+import { DashboardContext, type DashboardCtx } from './dashboard-ctx'
 
-interface RestaurantOption {
-  id:   string
-  name: string
-  role: StaffRole
-}
-
-interface DashboardCtx {
-  date:              Date
-  setDate:           (d: Date) => void
-  shift:             string
-  setShift:          (s: string) => void
-  restaurantId:      string
-  setRestaurantId:   (id: string) => void
-  restaurants:       RestaurantOption[]
-  userRole:          StaffRole | null
-}
-
-export const DashboardContext = createContext<DashboardCtx>({
-  date:            new Date(),
-  setDate:         () => {},
-  shift:           'all',
-  setShift:        () => {},
-  restaurantId:    '',
-  setRestaurantId: () => {},
-  restaurants:     [],
-  userRole:        null,
-})
-
-export function useDashboard() {
-  return useContext(DashboardContext)
-}
+export { useDashboard } from './dashboard-ctx'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [date, setDate]               = useState(new Date())
   const [shift, setShift]             = useState('all')
   const [restaurantId, setRestaurantId] = useState('')
 
+  const { user, isLoaded } = useUser()
   const { data: memberships, isLoading } = api.restaurant.getMyRestaurants.useQuery()
 
   // Set first restaurant as default
@@ -52,7 +30,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [memberships, restaurantId])
 
-  const restaurants: RestaurantOption[] = (memberships ?? []).map(m => ({
+  useEffect(() => {
+    if (!isLoaded || !user?.id || !restaurantId) return
+    try {
+      posthog.identify(user.id, {
+        email: user.primaryEmailAddress?.emailAddress,
+        restaurantId,
+      })
+    } catch {
+      /* analytics opcional */
+    }
+  }, [isLoaded, user?.id, user?.primaryEmailAddress?.emailAddress, restaurantId])
+
+  // Realtime: nova reserva → toast
+  useEffect(() => {
+    if (!restaurantId) return
+
+    let channel: ReturnType<ReturnType<typeof getSupabaseAnonClient>['channel']> | null = null
+
+    try {
+      const supabase = getSupabaseAnonClient()
+      channel = supabase
+        .channel(`new-reservations-${restaurantId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'Reservation',
+            filter: `restaurantId=eq.${restaurantId}`,
+          },
+          (payload: { new: { guestName?: string; partySize?: number } }) => {
+            const name = payload.new?.guestName ?? 'Novo cliente'
+            const size = payload.new?.partySize ?? 0
+            toast.info(`Nova reserva: ${name} — ${size} pessoa${size !== 1 ? 's' : ''}`, {
+              duration: 5000,
+            })
+          }
+        )
+        .subscribe()
+    } catch {
+      /* Supabase Realtime é opcional */
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          getSupabaseAnonClient().removeChannel(channel)
+        } catch {
+          /* ok */
+        }
+      }
+    }
+  }, [restaurantId])
+
+  const restaurants: DashboardCtx['restaurants'] = (memberships ?? []).map(m => ({
     id:   m.restaurant.id,
     name: m.restaurant.name,
     role: m.role,
@@ -69,7 +101,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       userRole,
     }}>
       <div className="flex h-screen bg-background overflow-hidden dark">
-        <Sidebar />
+        <div className="hidden md:flex h-full">
+          <Sidebar />
+        </div>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <DashboardHeader
             date={date}
@@ -80,7 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             selectedRestaurantId={restaurantId}
             onRestaurantChange={setRestaurantId}
           />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto pb-14 md:pb-0">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
@@ -91,9 +125,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <a href="/onboarding" className="text-sm underline text-primary">Criar restaurante</a>
               </div>
             ) : (
-              children
+              <motion.div
+                key={pathname}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                {children}
+              </motion.div>
             )}
           </main>
+          <MobileBottomNav />
         </div>
       </div>
     </DashboardContext.Provider>

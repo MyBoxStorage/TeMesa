@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,10 +11,13 @@ import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 
 const schema = z.object({
-  name:  z.string().min(2),
+  name: z.string().min(2),
   phone: z.string().min(8),
-  cnpj:  z.string().optional(),
+  cnpj: z.string().optional(),
+  googlePlaceId: z.string().optional(),
 })
+
+type FormValues = z.infer<typeof schema>
 
 export function ConfigGeral({ restaurantId }: { restaurantId: string }) {
   const { data: restaurant } = api.restaurant.getMyRestaurant.useQuery()
@@ -21,7 +25,25 @@ export function ConfigGeral({ restaurantId }: { restaurantId: string }) {
     onSuccess: () => toast.success('Salvo!'),
     onError: (e) => toast.error(e.message),
   })
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: { name: restaurant?.name ?? '', phone: restaurant?.phone ?? '', cnpj: restaurant?.cnpj ?? '' } })
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: '',
+      phone: '',
+      cnpj: '',
+      googlePlaceId: '',
+    },
+  })
+
+  useEffect(() => {
+    if (!restaurant) return
+    form.reset({
+      name: restaurant.name,
+      phone: restaurant.phone,
+      cnpj: restaurant.cnpj ?? '',
+      googlePlaceId: restaurant.googlePlaceId ?? '',
+    })
+  }, [restaurant, form])
 
   return (
     <div className="space-y-5">
@@ -30,27 +52,72 @@ export function ConfigGeral({ restaurantId }: { restaurantId: string }) {
         <p className="text-[12px] text-muted-foreground">Dados básicos exibidos no widget público.</p>
       </div>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(v => update.mutate({ restaurantId, ...v }))} className="space-y-4">
-          <FormField control={form.control} name="name" render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-[12px]">Nome do restaurante</FormLabel>
-              <FormControl><Input {...field} className="h-9 text-[13px] max-w-sm" /></FormControl>
-              <FormMessage className="text-[11px]" />
-            </FormItem>
-          )} />
-          <FormField control={form.control} name="phone" render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-[12px]">Telefone (WhatsApp)</FormLabel>
-              <FormControl><Input {...field} className="h-9 text-[13px] max-w-sm" /></FormControl>
-              <FormMessage className="text-[11px]" />
-            </FormItem>
-          )} />
-          <FormField control={form.control} name="cnpj" render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-[12px]">CNPJ (opcional)</FormLabel>
-              <FormControl><Input {...field} className="h-9 text-[13px] max-w-sm" /></FormControl>
-            </FormItem>
-          )} />
+        <form
+          onSubmit={form.handleSubmit((v) =>
+            update.mutate({
+              restaurantId,
+              name: v.name,
+              phone: v.phone,
+              cnpj: v.cnpj,
+              googlePlaceId: v.googlePlaceId?.trim() ? v.googlePlaceId.trim() : null,
+            })
+          )}
+          className="space-y-4"
+        >
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[12px]">Nome do restaurante</FormLabel>
+                <FormControl>
+                  <Input {...field} className="h-9 text-[13px] max-w-sm" />
+                </FormControl>
+                <FormMessage className="text-[11px]" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[12px]">Telefone (WhatsApp)</FormLabel>
+                <FormControl>
+                  <Input {...field} className="h-9 text-[13px] max-w-sm" />
+                </FormControl>
+                <FormMessage className="text-[11px]" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="cnpj"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[12px]">CNPJ (opcional)</FormLabel>
+                <FormControl>
+                  <Input {...field} className="h-9 text-[13px] max-w-sm" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="googlePlaceId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[12px]">Google Place ID (para avaliações)</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="ChIJ..." className="h-10 max-w-sm" />
+                </FormControl>
+                <p className="text-[11px] text-muted-foreground">
+                  Encontre em Google Maps → seu restaurante → &quot;Compartilhar&quot; → Place ID
+                </p>
+                <FormMessage className="text-[11px]" />
+              </FormItem>
+            )}
+          />
           <Button type="submit" size="sm" className="h-8 text-[12px]" disabled={update.isPending}>
             {update.isPending ? 'Salvando...' : 'Salvar'}
           </Button>

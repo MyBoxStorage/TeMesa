@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { X, Tag, Phone, Mail, Calendar, Star, Trash2, Save, AlertTriangle } from 'lucide-react'
+import { X, Tag, Phone, Mail, Calendar, Star, Trash2, Save, AlertTriangle, Repeat, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +11,14 @@ import { Badge } from '@/components/ui/badge'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const STATUS_LABELS: Record<string, string> = {
   CONFIRMED: 'Confirmada', CHECKED_IN: 'Check-in', FINISHED: 'Finalizada',
@@ -25,9 +33,63 @@ const STATUS_COLORS: Record<string, string> = {
 
 interface Props { customerId: string; restaurantId: string; onClose: () => void }
 
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
 export function CustomerDetail({ customerId, restaurantId, onClose }: Props) {
   const { data: customer, isLoading } = api.customers.getById.useQuery({ restaurantId, customerId })
   const utils = api.useUtils()
+
+  const { data: recurrings, refetch: refetchRecurring } = api.recurring.list.useQuery(
+    { restaurantId, customerId, activeOnly: false },
+    { enabled: !!customerId && !!restaurantId }
+  )
+  const { data: shifts } = api.shifts.list.useQuery({ restaurantId }, { enabled: !!restaurantId })
+  const { data: tables } = api.tables.list.useQuery({ restaurantId }, { enabled: !!restaurantId })
+
+  const [recurringOpen, setRecurringOpen] = useState(false)
+  const [dayOfWeek, setDayOfWeek] = useState('5')
+  const [shiftId, setShiftId] = useState('')
+  const [tableId, setTableId] = useState('__none')
+  const [partySize, setPartySize] = useState('2')
+  const [recurringNotes, setRecurringNotes] = useState('')
+
+  const createRecurring = api.recurring.create.useMutation({
+    onSuccess: () => {
+      void refetchRecurring()
+      void utils.customers.getById.invalidate()
+      toast.success('Reserva recorrente criada!')
+      setRecurringOpen(false)
+      setShiftId('')
+      setTableId('__none')
+      setPartySize('2')
+      setRecurringNotes('')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const toggleRecurring = api.recurring.toggle.useMutation({
+    onSuccess: () => {
+      void refetchRecurring()
+      toast.success('Atualizado')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const deleteRecurring = api.recurring.delete.useMutation({
+    onSuccess: () => {
+      void refetchRecurring()
+      toast.success('Removido')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const shiftOptions = useMemo(() => shifts ?? [], [shifts])
+  const tableOptions = useMemo(() => tables ?? [], [tables])
+
+  useEffect(() => {
+    if (!recurringOpen || !shiftOptions.length || shiftId) return
+    setShiftId(shiftOptions[0]!.id)
+  }, [recurringOpen, shiftOptions, shiftId])
 
   const [tagInput, setTagInput] = useState('')
   const [editTags, setEditTags] = useState<string[] | null>(null)
@@ -102,6 +164,172 @@ export function CustomerDetail({ customerId, restaurantId, onClose }: Props) {
                 </div>
               ))}
             </div>
+
+            {/* Reserva recorrente */}
+            <div className="space-y-2 border-t border-border pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[12px] font-medium flex items-center gap-1.5">
+                  <Repeat className="w-3.5 h-3.5" /> Reserva recorrente
+                </p>
+                <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => setRecurringOpen(true)}>
+                  <Plus className="w-3 h-3" /> Criar
+                </Button>
+              </div>
+              {!recurrings?.length ? (
+                <p className="text-[11px] text-muted-foreground">Nenhuma recorrência configurada.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {recurrings.map((rec) => (
+                    <li
+                      key={rec.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2"
+                    >
+                      <div className="text-[11px] min-w-0">
+                        <p className="font-medium">
+                          {DAY_LABELS[rec.dayOfWeek]} · {rec.partySize} pessoas
+                          {rec.isActive ? '' : ' (pausada)'}
+                        </p>
+                        {rec.notes && <p className="text-muted-foreground truncate">{rec.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[10px] px-2"
+                          onClick={() =>
+                            toggleRecurring.mutate({
+                              id: rec.id,
+                              restaurantId,
+                              isActive: !rec.isActive,
+                            })
+                          }
+                          disabled={toggleRecurring.isPending}
+                        >
+                          {rec.isActive ? 'Pausar' : 'Ativar'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[10px] px-2 text-red-400"
+                          onClick={() => {
+                            if (confirm('Excluir esta recorrência?')) {
+                              deleteRecurring.mutate({ id: rec.id, restaurantId })
+                            }
+                          }}
+                          disabled={deleteRecurring.isPending}
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Dialog open={recurringOpen} onOpenChange={setRecurringOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-[15px]">Nova reserva recorrente</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-1">
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Dia da semana</Label>
+                    <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                      <SelectTrigger className="h-9 text-[12px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAY_LABELS.map((label, i) => (
+                          <SelectItem key={label} value={String(i)} className="text-[12px]">
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Turno</Label>
+                    <Select value={shiftId} onValueChange={setShiftId}>
+                      <SelectTrigger className="h-9 text-[12px]">
+                        <SelectValue placeholder="Selecione o turno" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shiftOptions.map((s) => (
+                          <SelectItem key={s.id} value={s.id} className="text-[12px]">
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Mesa (opcional)</Label>
+                    <Select value={tableId} onValueChange={setTableId}>
+                      <SelectTrigger className="h-9 text-[12px]">
+                        <SelectValue placeholder="Nenhuma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none" className="text-[12px]">
+                          Nenhuma
+                        </SelectItem>
+                        {tableOptions.map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="text-[12px]">
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Nº de pessoas</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-9 text-[12px]"
+                      value={partySize}
+                      onChange={(e) => setPartySize(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Notas (opcional)</Label>
+                    <textarea
+                      className="w-full min-h-[64px] rounded-md border border-input bg-background px-3 py-2 text-[12px]"
+                      value={recurringNotes}
+                      onChange={(e) => setRecurringNotes(e.target.value)}
+                      placeholder="Preferência de horário, observações..."
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button variant="outline" size="sm" onClick={() => setRecurringOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={createRecurring.isPending || !shiftId}
+                    onClick={() => {
+                      const ps = parseInt(partySize, 10)
+                      if (!Number.isFinite(ps) || ps < 1) {
+                        toast.error('Informe o número de pessoas')
+                        return
+                      }
+                      createRecurring.mutate({
+                        restaurantId,
+                        customerId,
+                        dayOfWeek: parseInt(dayOfWeek, 10),
+                        shiftId,
+                        tableId: tableId && tableId !== '__none' ? tableId : undefined,
+                        partySize: ps,
+                        notes: recurringNotes.trim() || undefined,
+                      })
+                    }}
+                  >
+                    Salvar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Tags */}
             <div className="space-y-2">

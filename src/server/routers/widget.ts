@@ -109,4 +109,54 @@ export const widgetRouter = router({
       if (!record) return { status: 'NOT_FOUND' as const }
       return { status: record.status, expiresAt: record.expiresAt }
     }),
+
+  getReservationByToken: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const reservation = await ctx.prisma.reservation.findFirst({
+        where: { confirmToken: input.token },
+        include: { restaurant: { select: { name: true, googlePlaceId: true } } },
+      })
+      return reservation
+    }),
+
+  submitReview: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        rating: z.number().int().min(1).max(5),
+        comment: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const reservation = await ctx.prisma.reservation.findFirst({
+        where: { confirmToken: input.token },
+        include: { restaurant: { select: { googlePlaceId: true } } },
+      })
+      if (!reservation) throw new TRPCError({ code: 'NOT_FOUND', message: 'Reserva não encontrada' })
+
+      if (reservation.customerId) {
+        const existingRow = await ctx.prisma.customer.findUnique({
+          where: { id: reservation.customerId },
+          select: { preferences: true },
+        })
+        const existing = (existingRow?.preferences ?? {}) as Record<string, unknown>
+
+        await ctx.prisma.customer.update({
+          where: { id: reservation.customerId },
+          data: {
+            preferences: {
+              ...existing,
+              lastReview: { rating: input.rating, comment: input.comment, date: new Date().toISOString() },
+            } as any,
+          },
+        })
+      }
+
+      const googleReviewUrl = reservation.restaurant?.googlePlaceId
+        ? `https://search.google.com/local/writereview?placeid=${reservation.restaurant.googlePlaceId}`
+        : null
+
+      return { ok: true as const, googleReviewUrl }
+    }),
 })

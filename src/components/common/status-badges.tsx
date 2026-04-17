@@ -57,13 +57,26 @@ const RES_CLASS: Record<ReservationStatus, string> = {
   NO_SHOW:         'res-no-show',
   CANCELLED:       'res-cancelled',
 }
+const RES_DOT: Record<ReservationStatus, string> = {
+  PENDING:         'bg-amber-400',
+  PENDING_PAYMENT: 'bg-amber-500',
+  CONFIRMED:       'bg-blue-400',
+  CHECKED_IN:      'bg-green-400',
+  FINISHED:        'bg-zinc-400',
+  NO_SHOW:         'bg-orange-400',
+  CANCELLED:       'bg-red-400',
+}
 
 export function ReservationStatusBadge({ status }: { status: ReservationStatus }) {
   return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', RES_CLASS[status])}>
+    <span className={cn(
+      'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold',
+      RES_CLASS[status],
+    )}>
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', RES_DOT[status])} />
       {RES_LABEL[status]}
     </span>
   )
 }
 
-export { RES_LABEL, TABLE_LABEL }
+export { RES_LABEL, TABLE_LABEL, RES_DOT }

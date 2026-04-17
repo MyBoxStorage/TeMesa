@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { format, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -18,11 +18,32 @@ import {
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { posthog } from '@/lib/posthog'
+import confetti from 'canvas-confetti'
+
+function maskPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length === 0) return ''
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
+function phoneToE164(masked: string): string {
+  const digits = masked.replace(/\D/g, '')
+  if (digits.length < 10) return ''
+  return `+55${digits}`
+}
+
+function isDayOpenForDate(iso: string, activeDays: number[] | undefined): boolean {
+  if (!activeDays?.length) return true
+  const dayOfWeek = new Date(`${iso}T12:00:00`).getDay()
+  return activeDays.includes(dayOfWeek)
+}
 
 // ── Tipos de step ─────────────────────────────────────────────────────────────
 
 type Step =
-  | 'welcome'
   | 'occasion'
   | 'schedule'
   | 'identity'
@@ -33,7 +54,7 @@ type Step =
   | 'success'
 
 const STEPS_ORDERED: Step[] = [
-  'welcome', 'occasion', 'schedule',
+  'occasion', 'schedule',
   'identity', 'profile', 'preferences', 'referral',
 ]
 
@@ -98,7 +119,7 @@ const T = {
     pick_date_first: 'Selecione um dia para ver os horários',
     step_identity: 'Seus dados de contato',
     namePlaceholder: 'Seu nome completo *',
-    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    phonePlaceholder: '(47) 99999-0000',
     emailPlaceholder: 'E-mail (opcional)',
     step_profile: 'Nos conte um pouco sobre você',
     origin_title: 'Você é de Balneário?',
@@ -133,6 +154,8 @@ const T = {
     waitingPayment: 'Aguardando confirmação do pagamento...',
     youWillReceiveWhatsApp: 'Você receberá uma confirmação no WhatsApp.',
     makeAnother: 'Fazer outra reserva',
+    shareFriends: 'Compartilhar com amigos',
+    linkCopied: 'Link copiado!',
     contactForLargerGroups: 'Para grupos maiores, entre em contato diretamente.',
     poweredBy: 'Powered by TeMesa',
     back: '← Voltar', next: 'Continuar →',
@@ -162,7 +185,7 @@ const T = {
     pick_date_first: 'Select a day to see available times',
     step_identity: 'Your contact details',
     namePlaceholder: 'Your full name *',
-    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    phonePlaceholder: '(47) 99999-0000',
     emailPlaceholder: 'Email (optional)',
     step_profile: 'Tell us about yourself',
     origin_title: 'Are you local?',
@@ -195,6 +218,8 @@ const T = {
     waitingPayment: 'Waiting for payment confirmation...',
     youWillReceiveWhatsApp: 'You will receive a WhatsApp confirmation.',
     makeAnother: 'Make another reservation',
+    shareFriends: 'Share with friends',
+    linkCopied: 'Link copied!',
     contactForLargerGroups: 'For larger groups, contact us directly.',
     poweredBy: 'Powered by TeMesa',
     back: '← Back', next: 'Continue →',
@@ -224,7 +249,7 @@ const T = {
     pick_date_first: 'Selecciona un día para ver los horarios',
     step_identity: 'Tus datos de contacto',
     namePlaceholder: 'Tu nombre completo *',
-    phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
+    phonePlaceholder: '(47) 99999-0000',
     emailPlaceholder: 'Correo electrónico (opcional)',
     step_profile: 'Cuéntanos sobre ti',
     origin_title: '¿Eres local?',
@@ -257,6 +282,8 @@ const T = {
     waitingPayment: 'Esperando confirmación del pago...',
     youWillReceiveWhatsApp: 'Recibirás una confirmación por WhatsApp.',
     makeAnother: 'Hacer otra reserva',
+    shareFriends: 'Compartir con amigos',
+    linkCopied: '¡Enlace copiado!',
     contactForLargerGroups: 'Para grupos más grandes, contáctanos directamente.',
     poweredBy: 'Powered by TeMesa',
     back: '← Volver', next: 'Continuar →',
@@ -283,7 +310,12 @@ function SelectCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate(10)
+        }
+        onClick()
+      }}
       className={cn(
         'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all',
         'hover:scale-[1.03] active:scale-[0.97]',
@@ -299,22 +331,6 @@ function SelectCard({
   )
 }
 
-// ── Progress bar ──────────────────────────────────────────────────────────────
-
-function ProgressBar({ step, primary }: { step: Step; primary: string }) {
-  const idx = STEPS_ORDERED.indexOf(step)
-  const total = STEPS_ORDERED.length
-  const pct = idx < 0 ? 100 : Math.round(((idx + 1) / total) * 100)
-  return (
-    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${pct}%`, backgroundColor: primary }}
-      />
-    </div>
-  )
-}
-
 // ── Componente principal ──────────────────────────────────────────────────────
 
 interface Restaurant {
@@ -325,17 +341,17 @@ interface Restaurant {
   blockedDates?: string[]
 }
 
-const GUEST_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8]
 const ICON_SIZE = 22
 
 export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   const [lang, setLang] = useState<Lang>('PT')
-  const [step, setStep] = useState<Step>('welcome')
+  const [step, setStep] = useState<Step>('occasion')
   const [form, setForm] = useState<FormData>(DEFAULT_FORM)
   const [pixData, setPixData] = useState<{
     pixCode: string; pixQrCodeUrl: string; amountCents: number; expiresAt: Date; prepaymentRecordId: string
   } | null>(null)
   const [copied, setCopied] = useState(false)
+  const visitFrequencyAnchorRef = useRef<HTMLDivElement>(null)
 
   const t = T[lang]
   const primary = (restaurant.themeConfig?.primaryColor as string) ?? '#C8A96E'
@@ -350,6 +366,11 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
   const create = api.widget.createReservation.useMutation({
     onSuccess: (data) => {
+      try {
+        posthog.capture('reservation_created', { source: 'widget', slug: restaurant.slug })
+      } catch {
+        /* analytics opcional */
+      }
       if (data.prepayment) {
         setPixData({ ...data.prepayment })
         setStep('pix')
@@ -368,6 +389,24 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
     if (paymentStatus?.status === 'PAID') setStep('success')
   }, [paymentStatus])
 
+  useEffect(() => {
+    try {
+      posthog.capture('widget_step_completed', { step, slug: restaurant.slug })
+    } catch {
+      /* analytics opcional */
+    }
+  }, [step, restaurant.slug])
+
+  useEffect(() => {
+    if (step !== 'success') return
+    confetti({
+      particleCount: 80,
+      spread: 60,
+      origin: { y: 0.7 },
+      colors: [primary, '#ffffff', '#fbbf24'],
+    })
+  }, [step, primary])
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
@@ -380,12 +419,6 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
   const today    = format(new Date(), 'yyyy-MM-dd')
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
-
-  const normalizeToE164 = (raw: string): string => {
-    const digits = raw.replace(/\D/g, '')
-    if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
-    return `+55${digits}`
-  }
 
   // Disparar OPTIN_ACCEPTED para o BC Connect (fire-and-forget no cliente)
   const fireOptinEvent = useCallback((checked: boolean) => {
@@ -404,14 +437,15 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
   const handleSubmit = () => {
     if (!form.name.trim()) return toast.error(t.enterName)
-    if (!form.phone.trim()) return toast.error(t.enterPhone)
+    const e164Phone = phoneToE164(form.phone)
+    if (!e164Phone) return toast.error(t.enterPhone)
     if (!form.lgpd) return toast.error(t.acceptTerms)
     if (!form.selectedSlot) return
 
     create.mutate({
       slug: restaurant.slug,
       guestName: form.name,
-      guestPhone: normalizeToE164(form.phone),
+      guestPhone: e164Phone,
       guestEmail: form.email || undefined,
       partySize: form.partySize,
       date: new Date(`${form.date}T${form.selectedSlot.startTime}:00`),
@@ -436,7 +470,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   }, [pixData])
 
   const resetAndStart = () => {
-    setStep('welcome')
+    setStep('occasion')
     setForm(DEFAULT_FORM)
     setPixData(null)
     setCopied(false)
@@ -460,62 +494,47 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
     <div className="min-h-screen flex items-start justify-center py-8 px-4" style={{ background: '#0a0a0a' }}>
       <div className="w-full max-w-md">
 
-        {/* Cabeçalho do restaurante */}
-        <div className="text-center mb-5">
-          {restaurant.logoUrl ? (
-            <img src={restaurant.logoUrl} alt={restaurant.name}
-              className="w-14 h-14 rounded-full mx-auto mb-3 object-cover ring-2 ring-white/10" />
-          ) : (
-            <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center text-xl font-bold text-white ring-2 ring-white/10"
-              style={{ backgroundColor: primary }}>
-              {restaurant.name[0]}
+        {/* Header fixo com branding — visível em todos os steps */}
+        {step !== 'success' && step !== 'pix' && (
+          <div className="flex items-center gap-3 mb-4">
+            {restaurant.logoUrl ? (
+              <img src={restaurant.logoUrl} alt="" className="w-8 h-8 rounded-lg object-cover" />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+                style={{ backgroundColor: primary, color: '#fff' }}
+              >
+                {restaurant.name.charAt(0)}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-bold text-white">{restaurant.name}</p>
+              <p className="text-[10px] text-zinc-500">{t.onlineReservations}</p>
             </div>
-          )}
-          <h1 className="text-base font-semibold text-white tracking-widest uppercase">{restaurant.name}</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">{t.onlineReservations}</p>
-        </div>
+          </div>
+        )}
 
-        {/* Barra de progresso — apenas nos steps de coleta */}
-        {step !== 'welcome' && step !== 'pix' && step !== 'success' && (
-          <div className="mb-4">
-            <ProgressBar step={step} primary={primary} />
+        {/* Progress bar */}
+        {step !== 'success' && step !== 'pix' && (
+          <div className="w-full h-[2px] bg-zinc-800 rounded-full mb-4 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{
+                backgroundColor: primary,
+                width: `${((STEPS_ORDERED.indexOf(step) + 1) / STEPS_ORDERED.length) * 100}%`,
+              }}
+            />
           </div>
         )}
 
         <AnimatePresence mode="wait">
-
-          {/* ── WELCOME ─────────────────────────────────────────────────── */}
-          {step === 'welcome' && (
-            <motion.div key="welcome" {...anim}>
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-8 text-center space-y-5">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
-                  style={{ backgroundColor: `${primary}22`, border: `2px solid ${primary}44` }}>
-                  <Calendar className="w-8 h-8" style={{ color: primary }} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white mb-2">{t.welcome_title}</h2>
-                  <p className="text-sm text-zinc-400 leading-relaxed">{t.welcome_sub}</p>
-                </div>
-                <button
-                  onClick={() => setStep('occasion')}
-                  className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{ backgroundColor: primary, borderRadius: radius }}
-                >
-                  {t.welcome_cta}
-                </button>
-              </div>
-            </motion.div>
-          )}
 
           {/* ── OCCASION ────────────────────────────────────────────────── */}
           {step === 'occasion' && (
             <motion.div key="occasion" {...anim}>
               <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-zinc-800">
-                  <button onClick={() => setStep('welcome')} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <p className="text-sm font-semibold text-white flex-1 text-center pr-8">{t.step_occasion}</p>
+                  <p className="text-sm font-semibold text-white flex-1 text-center">{t.step_occasion}</p>
                 </div>
                 <div className="p-4 grid grid-cols-2 gap-2">
                   {([
@@ -530,7 +549,10 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   ] as const).map((o) => (
                     <SelectCard key={o.value} icon={o.icon} label={o.label} primary={primary}
                       selected={form.occasionType === o.value}
-                      onClick={() => { set('occasionType', o.value); setStep('schedule') }} />
+                      onClick={() => {
+                        set('occasionType', o.value)
+                        setTimeout(() => setStep('schedule'), 350)
+                      }} />
                   ))}
                 </div>
                 <div className="px-4 pb-4">
@@ -676,33 +698,39 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                         const isBlocked = (restaurant.blockedDates ?? []).includes(iso)
                         const isDisabled = isClosed || isBlocked
                         const isSelected = form.date === iso
+                        const isOpen = isDayOpenForDate(iso, restaurant.activeDaysOfWeek) && !isBlocked
 
                         return (
-                          <button
-                            key={iso}
-                            type="button"
-                            disabled={isDisabled}
-                            onClick={() => {
-                              set('date', iso)
-                              set('selectedSlot', null)
-                            }}
-                            title={isClosed ? t.closed : isBlocked ? t.blocked : undefined}
-                            className={cn(
-                              'flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-center transition-all',
-                              isDisabled
-                                ? 'border-zinc-800 bg-zinc-900 opacity-30 cursor-not-allowed'
-                                : isSelected
-                                  ? 'border-transparent text-white scale-105 shadow-lg'
-                                  : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500 hover:scale-[1.04]',
+                          <div key={iso} className="relative flex flex-col items-center pb-3">
+                            <button
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => {
+                                set('date', iso)
+                                set('selectedSlot', null)
+                              }}
+                              title={isClosed ? t.closed : isBlocked ? t.blocked : undefined}
+                              className={cn(
+                                'w-full flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-center transition-all',
+                                isDisabled
+                                  ? 'border-zinc-800 bg-zinc-900 opacity-30 pointer-events-none cursor-not-allowed'
+                                  : isSelected
+                                    ? 'border-transparent text-white scale-105 shadow-lg'
+                                    : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500 hover:scale-[1.04]',
+                              )}
+                              style={isSelected && !isDisabled ? { backgroundColor: primary, borderColor: primary } : {}}
+                            >
+                              <span className="text-[9px] font-medium capitalize opacity-70">{weekLabel}</span>
+                              <span className="text-sm font-bold leading-none">{dayNum}</span>
+                            </button>
+                            {isOpen ? (
+                              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-green-500" />
+                            ) : (
+                              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[7px] text-zinc-600 whitespace-nowrap">
+                                {isBlocked ? t.blocked : t.closed}
+                              </span>
                             )}
-                            style={isSelected && !isDisabled ? { backgroundColor: primary, borderColor: primary } : {}}
-                          >
-                            <span className="text-[9px] font-medium capitalize opacity-70">{weekLabel}</span>
-                            <span className="text-sm font-bold leading-none">{dayNum}</span>
-                            {isBlocked && !isClosed && (
-                              <span className="text-[7px] leading-none opacity-60">●</span>
-                            )}
-                          </button>
+                          </div>
                         )
                       })}
                     </div>
@@ -816,7 +844,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                     onChange={(e) => set('name', e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors" />
                   <input type="tel" placeholder={t.phonePlaceholder} value={form.phone}
-                    onChange={(e) => set('phone', e.target.value)}
+                    onChange={(e) => set('phone', maskPhone(e.target.value))}
                     className="w-full bg-zinc-800 border border-zinc-700 focus:border-zinc-500 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors" />
                   <input type="email" placeholder={t.emailPlaceholder} value={form.email}
                     onChange={(e) => set('email', e.target.value)}
@@ -825,7 +853,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   <button
                     onClick={() => {
                       if (!form.name.trim()) return toast.error(t.enterName)
-                      if (!form.phone.trim()) return toast.error(t.enterPhone)
+                      if (!phoneToE164(form.phone)) return toast.error(t.enterPhone)
                       setStep('profile')
                     }}
                     className="w-full py-3.5 rounded-xl text-sm font-bold text-white mt-1 transition-all hover:opacity-90 active:scale-[0.98]"
@@ -861,13 +889,21 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                       ] as const).map((o) => (
                         <SelectCard key={o.value} icon={o.icon} label={o.label} primary={primary}
                           selected={form.originType === o.value}
-                          onClick={() => set('originType', o.value)} />
+                          onClick={() => {
+                            set('originType', o.value)
+                            setTimeout(() => {
+                              visitFrequencyAnchorRef.current?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'nearest',
+                              })
+                            }, 100)
+                          }} />
                       ))}
                     </div>
                   </div>
 
                   {/* Frequência */}
-                  <div>
+                  <div ref={visitFrequencyAnchorRef} id="widget-visit-frequency">
                     <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">{t.freq_title}</p>
                     <div className="grid grid-cols-1 gap-2">
                       {([
@@ -878,7 +914,13 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                         { icon: <Star size={ICON_SIZE} />,         label: t.frq_first,    value: 'FIRST_TIME' },
                       ] as const).map((o) => (
                         <button key={o.value} type="button"
-                          onClick={() => set('visitFrequency', o.value)}
+                          onClick={() => {
+                            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                              navigator.vibrate(10)
+                            }
+                            set('visitFrequency', o.value)
+                            setTimeout(() => setStep('preferences'), 350)
+                          }}
                           className={cn(
                             'flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all hover:scale-[1.01]',
                             form.visitFrequency === o.value
@@ -1131,6 +1173,26 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   </div>
                   <p className="text-xs text-zinc-500 mt-3">{t.youWillReceiveWhatsApp}</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const shareData = {
+                      title: `Reservei no ${restaurant.name}!`,
+                      text: `Reserve também no ${restaurant.name}:`,
+                      url: typeof window !== 'undefined' ? window.location.href : '',
+                    }
+                    if (typeof navigator !== 'undefined' && navigator.share) {
+                      navigator.share(shareData).catch(() => {})
+                    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                      void navigator.clipboard.writeText(shareData.url)
+                      toast.success(t.linkCopied)
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors py-2"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  {t.shareFriends}
+                </button>
                 <button onClick={resetAndStart}
                   className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors">
                   {t.makeAnother}

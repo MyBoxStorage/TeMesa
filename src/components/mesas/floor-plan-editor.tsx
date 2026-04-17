@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { useDashboard } from '@/app/(dashboard)/dashboard/layout'
+import { useDashboard } from '@/app/(dashboard)/dashboard/dashboard-ctx'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES

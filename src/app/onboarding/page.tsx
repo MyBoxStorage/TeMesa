@@ -26,6 +26,7 @@ const schema0 = z.object({
   name:  z.string().min(2, 'Mínimo 2 caracteres'),
   phone: z.string().min(10, 'Telefone inválido'),
   slug:  z.string().min(2).regex(/^[a-z0-9-]+$/, 'Apenas letras minúsculas, números e hífens'),
+  businessType: z.enum(['bar', 'casual', 'fine_dining', 'lounge', 'cafe']).default('casual'),
 })
 
 export default function OnboardingPage() {
@@ -62,7 +63,10 @@ export default function OnboardingPage() {
     onError: (e) => toast.error(e.message),
   })
 
-  const form0 = useForm({ resolver: zodResolver(schema0), defaultValues: { name: '', phone: '', slug: '' } })
+  const form0 = useForm({
+    resolver: zodResolver(schema0),
+    defaultValues: { name: '', phone: '', slug: '', businessType: 'casual' as const },
+  })
 
   const pendingInviteValid = Boolean(
     pendingInvite &&
@@ -127,7 +131,7 @@ export default function OnboardingPage() {
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-all duration-300',
                 i < step  ? 'bg-green-500 text-white' :
-                i === step ? 'bg-foreground text-background ring-4 ring-foreground/20' :
+                i === step ? 'bg-primary text-primary-foreground ring-4 ring-primary/25' :
                              'bg-muted text-muted-foreground'
               )}>
                 {i < step ? <Check className="w-3.5 h-3.5" /> : i + 1}
@@ -146,7 +150,7 @@ export default function OnboardingPage() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
-          className="bg-card border border-border rounded-2xl p-8 shadow-sm"
+          className="bg-card border border-border/50 rounded-2xl p-8 shadow-lg shadow-primary/5"
         >
           {/* Header */}
           <div className="mb-6">
@@ -170,7 +174,12 @@ export default function OnboardingPage() {
           {/* Step content */}
           {step === 0 && (
             <Form {...form0}>
-              <form onSubmit={form0.handleSubmit(v => createRestaurant.mutate({ ...v, address: {} }))} className="space-y-4">
+              <form
+                onSubmit={form0.handleSubmit((v) =>
+                  createRestaurant.mutate({ ...v, address: {} })
+                )}
+                className="space-y-4"
+              >
                 <FormField control={form0.control} name="name" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[12px]">Nome do restaurante *</FormLabel>
@@ -208,6 +217,39 @@ export default function OnboardingPage() {
                     <FormMessage className="text-[11px]" />
                   </FormItem>
                 )} />
+                <FormField
+                  control={form0.control}
+                  name="businessType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[12px]">Tipo de estabelecimento</FormLabel>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: 'bar' as const, label: '🍺 Bar', desc: 'Happy hour, petiscos' },
+                          { value: 'casual' as const, label: '🍽️ Casual', desc: 'Almoço e jantar' },
+                          { value: 'fine_dining' as const, label: '✨ Fine Dining', desc: 'Alta gastronomia' },
+                          { value: 'lounge' as const, label: '🎵 Lounge/Balada', desc: 'Noite, drinks' },
+                          { value: 'cafe' as const, label: '☕ Café', desc: 'Manhã e tarde' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => field.onChange(opt.value)}
+                            className={cn(
+                              'p-3 border rounded-lg text-left transition-all',
+                              field.value === opt.value
+                                ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                                : 'border-border hover:border-primary/50'
+                            )}
+                          >
+                            <p className="text-sm font-medium">{opt.label}</p>
+                            <p className="text-[11px] text-muted-foreground">{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </FormItem>
+                  )}
+                />
                 <StepFooter
                   onSkip={() => setStep(1)}
                   isSubmit loading={createRestaurant.isPending}
@@ -219,14 +261,13 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="space-y-4">
               <p className="text-[13px] text-muted-foreground">
-                Configure os turnos depois em <strong>Configurações → Turnos</strong>. Por padrão, o sistema usará horários genéricos até você personalizar.
+                Criamos automaticamente turnos e mesas para o seu tipo de estabelecimento. Você pode personalizar
+                tudo depois em <strong>Configurações → Turnos</strong> e <strong>Mesas</strong>.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                {['Almoço 12h–15h', 'Jantar 19h–23h'].map(s => (
-                  <div key={s} className="p-3 border border-border rounded-lg bg-muted/30 text-[12px] text-center font-medium">
-                    {s}
-                  </div>
-                ))}
+              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-[12px] text-green-300">
+                  ✅ Turnos e mesas pré-configurados com base no seu tipo de restaurante
+                </p>
               </div>
               <StepFooter onSkip={() => setStep(2)} onNext={() => setStep(2)} />
             </div>

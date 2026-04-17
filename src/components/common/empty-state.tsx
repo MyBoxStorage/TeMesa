@@ -44,13 +44,19 @@ export function SkeletonCard() {
 
 export function SkeletonRow() {
   return (
-    <div className="flex items-center gap-3 p-3 border-b border-border/50">
-      <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
-      <div className="flex-1 space-y-2">
-        <SkeletonLine className="h-3 w-1/3" />
-        <SkeletonLine className="h-3 w-1/4" />
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 animate-pulse">
+      <div className="w-8 h-8 rounded-full bg-muted shrink-0" />
+      <div className="flex-1 space-y-1.5">
+        <div className="flex items-center justify-between">
+          <div className="h-3.5 w-28 bg-muted rounded" />
+          <div className="h-3 w-10 bg-muted rounded" />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-2.5 w-16 bg-muted rounded" />
+          <div className="h-2.5 w-14 bg-muted rounded" />
+        </div>
       </div>
-      <SkeletonLine className="h-5 w-16 rounded-full" />
+      <div className="h-5 w-20 bg-muted rounded-full shrink-0" />
     </div>
   )
 }

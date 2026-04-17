@@ -117,6 +117,8 @@ model Restaurant {
   operatingHours     Json
   settings           Json?
   prepaymentConfig   Json?
+  noShowProtectionAddon Boolean @default(false)
+  googlePlaceId      String?
   onboardingStatus   Json      @default("{\"restaurant\":false,\"shifts\":false,\"tables\":false,\"notifications\":false}")
   bcConnectPartnerId String?
   bcConnectApiKey    String?
@@ -131,6 +133,7 @@ model Restaurant {
   shifts                Shift[]
   reservations          Reservation[]
   customers             Customer[]
+  recurringReservations RecurringReservation[]
   waitlistEntries       WaitlistEntry[]
   notificationTemplates NotificationTemplate[]
   autoTags              AutoTag[]
@@ -248,6 +251,25 @@ model ReservationStatusHistory {
   createdAt     DateTime           @default(now())
 }
 
+model RecurringReservation {
+  id             String   @id @default(cuid())
+  restaurantId   String
+  customerId     String
+  tableId        String?
+  shiftId        String?
+  dayOfWeek      Int
+  partySize      Int
+  isActive       Boolean  @default(true)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, isActive])
+}
+
 model PrepaymentRecord {
   id             String        @id @default(cuid())
   reservationId  String        @unique
@@ -283,6 +305,7 @@ model Customer {
   reliabilityScore Float     @default(100)
   restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   reservations     Reservation[]
+  recurringReservations RecurringReservation[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   @@unique([restaurantId, phone])

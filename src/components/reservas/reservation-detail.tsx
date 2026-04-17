@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
   X, Users, MapPin, Clock, Phone, Mail, MessageSquare,
-  CheckCircle, XCircle, AlertTriangle, LogIn, Flag, MoreHorizontal,
+  CheckCircle, XCircle, AlertTriangle, LogIn, Flag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ReservationStatusBadge } from '@/components/common/status-badges'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
-import type { Reservation, Customer, Table, Shift, Server } from '@prisma/client'
+import type { Reservation, Customer, Table, Shift, Server, ReservationStatus } from '@prisma/client'
+import { cn } from '@/lib/utils'
 
 const ORIGIN_LABELS: Record<string, string> = {
   LOCAL:       '📍 Morador local',
@@ -99,85 +100,165 @@ export function ReservationDetail({ reservation, restaurantId, onClose }: Props)
   const dateStr = format(new Date(reservation.date), "EEEE, dd 'de' MMMM", { locale: ptBR })
   const initials = reservation.guestName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
+  const avatarColors = [
+    'from-blue-600 to-blue-800', 'from-emerald-600 to-emerald-800', 'from-violet-600 to-violet-800',
+    'from-rose-600 to-rose-800', 'from-amber-600 to-amber-800', 'from-teal-600 to-teal-800', 'from-indigo-600 to-indigo-800',
+  ]
+  const avatarGrad = avatarColors[reservation.guestName.charCodeAt(0) % avatarColors.length]
+
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <ReservationStatusBadge status={reservation.status} />
-          {reservation.table && (
-            <span className="text-[12px] text-muted-foreground">{reservation.table.name}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button size="icon" variant="ghost" className="h-7 w-7">
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClose}>
-            <X className="w-3.5 h-3.5" />
-          </Button>
+      {/* Hero header */}
+      <div className="relative overflow-hidden border-b border-border">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/12 via-background to-background pointer-events-none" />
+        <div className="relative px-5 pt-4 pb-4">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className={cn(
+                'w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-lg font-bold text-white shrink-0 shadow-md',
+                avatarGrad,
+              )}>
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-[18px] font-bold tracking-tight truncate">{reservation.guestName}</h2>
+                <div className="mt-1.5">
+                  <ReservationStatusBadge status={reservation.status} />
+                </div>
+              </div>
+            </div>
+            <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-xl" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              {time}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              {reservation.partySize} pessoas
+            </span>
+            {reservation.table && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {reservation.table.area || reservation.table.name}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-3 mt-3">
+            <a
+              href={`tel:${reservation.guestPhone}`}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              {reservation.guestPhone}
+            </a>
+            {reservation.guestEmail && (
+              <a
+                href={`mailto:${reservation.guestEmail}`}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline truncate max-w-full"
+              >
+                <Mail className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{reservation.guestEmail}</span>
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Quick info bar */}
-      <div className="flex items-center gap-4 px-5 py-3 border-b border-border bg-muted/20">
-        <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-          <Clock className="w-3.5 h-3.5" />{time}
-        </span>
-        <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-          <Users className="w-3.5 h-3.5" />{reservation.partySize} pessoas
-        </span>
-        {reservation.table && (
-          <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-            <MapPin className="w-3.5 h-3.5" />{reservation.table.area || reservation.table.name}
-          </span>
-        )}
-      </div>
+      {/* ── Barra de ações contextuais ──────────────────────────────────── */}
+      {(() => {
+        const actions: Array<{
+          label: string
+          status: ReservationStatus
+          variant: 'default' | 'destructive' | 'outline'
+          className?: string
+        }> = []
+
+        if (reservation.status === 'PENDING' || reservation.status === 'PENDING_PAYMENT') {
+          actions.push(
+            { label: 'Confirmar', status: 'CONFIRMED', variant: 'default', className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+            { label: 'Cancelar', status: 'CANCELLED', variant: 'destructive' },
+          )
+        } else if (reservation.status === 'CONFIRMED') {
+          actions.push(
+            { label: 'Check-in', status: 'CHECKED_IN', variant: 'default', className: 'bg-green-600 hover:bg-green-700 text-white' },
+            { label: 'Cancelar', status: 'CANCELLED', variant: 'destructive' },
+            { label: 'No-show', status: 'NO_SHOW', variant: 'outline', className: 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10' },
+          )
+        } else if (reservation.status === 'CHECKED_IN') {
+          actions.push(
+            { label: 'Finalizar', status: 'FINISHED', variant: 'default', className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
+          )
+        }
+
+        if (actions.length === 0) return null
+
+        return (
+          <div className="flex gap-2 px-5 py-3 border-b border-border bg-muted/10">
+            {actions.map((a) => (
+              <Button
+                key={a.status}
+                variant={a.variant}
+                size="sm"
+                className={cn('flex-1 h-11 gap-1.5 text-[13px] font-semibold', a.className)}
+                onClick={() => {
+                  if (a.status === 'CANCELLED' || a.status === 'NO_SHOW') {
+                    if (!confirm(`Tem certeza que deseja marcar como ${a.label}?`)) return
+                  }
+                  updateStatus.mutate({
+                    restaurantId,
+                    reservationId: reservation.id,
+                    status: a.status,
+                  })
+                }}
+                disabled={updateStatus.isPending}
+              >
+                {a.status === 'CONFIRMED' && <CheckCircle className="w-4 h-4" />}
+                {a.status === 'CANCELLED' && <XCircle className="w-4 h-4" />}
+                {a.status === 'CHECKED_IN' && <LogIn className="w-4 h-4" />}
+                {a.status === 'NO_SHOW' && <AlertTriangle className="w-4 h-4" />}
+                {a.status === 'FINISHED' && <Flag className="w-4 h-4" />}
+                {a.label}
+              </Button>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Tabs */}
-      <Tabs defaultValue="guest" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-3 h-8 text-[12px] bg-muted/40">
-          <TabsTrigger value="guest" className="text-[12px]">Hóspede</TabsTrigger>
-          <TabsTrigger value="reservation" className="text-[12px]">Reserva</TabsTrigger>
-          <TabsTrigger value="history" className="text-[12px]">Histórico</TabsTrigger>
+      <Tabs defaultValue="guest" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="mx-4 mt-3 h-10 p-1 gap-0.5 rounded-xl bg-muted/50 text-[12px]">
+          <TabsTrigger value="guest" className="flex-1 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Hóspede
+          </TabsTrigger>
+          <TabsTrigger value="reservation" className="flex-1 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Reserva
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex-1 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Histórico
+          </TabsTrigger>
         </TabsList>
 
         {/* GUEST TAB */}
         <TabsContent value="guest" className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {/* Profile */}
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-lg font-bold text-white shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-[15px] font-semibold leading-tight mb-1">{reservation.guestName}</h3>
-              {reservation.customer && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {reservation.customer.visitCount > 5 && (
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Cliente frequente</Badge>
-                  )}
-                  {reservation.customer.noShowCount > 1 && (
-                    <Badge variant="destructive" className="text-[10px] h-4 px-1.5">
-                      {reservation.customer.noShowCount} no-shows
-                    </Badge>
-                  )}
-                  {reservation.customer.tags?.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="text-[10px] h-4 px-1.5">{tag}</Badge>
-                  ))}
-                </div>
+          {reservation.customer && (
+            <div className="flex flex-wrap gap-1.5">
+              {reservation.customer.visitCount > 5 && (
+                <Badge variant="secondary" className="text-[10px] h-5 px-2">Cliente frequente</Badge>
               )}
-              <div className="space-y-1">
-                <a href={`tel:${reservation.guestPhone}`} className="flex items-center gap-2 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                  <Phone className="w-3 h-3" />{reservation.guestPhone}
-                </a>
-                {reservation.guestEmail && (
-                  <a href={`mailto:${reservation.guestEmail}`} className="flex items-center gap-2 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                    <Mail className="w-3 h-3" />{reservation.guestEmail}
-                  </a>
-                )}
-              </div>
+              {reservation.customer.noShowCount > 1 && (
+                <Badge variant="destructive" className="text-[10px] h-5 px-2">
+                  {reservation.customer.noShowCount} no-shows
+                </Badge>
+              )}
+              {reservation.customer.tags?.slice(0, 6).map(tag => (
+                <Badge key={tag} variant="outline" className="text-[10px] h-5 px-2">{tag}</Badge>
+              ))}
             </div>
-          </div>
+          )}
 
           {/* Customer stats */}
           {reservation.customer && (
@@ -285,9 +366,9 @@ export function ReservationDetail({ reservation, restaurantId, onClose }: Props)
               { label: 'Origem',  value: reservation.source },
               { label: 'LGPD',    value: reservation.lgpdConsent ? 'Aceito' : 'Não aceito' },
             ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-2 border-b border-border/40">
-                <span className="text-[12px] text-muted-foreground">{label}</span>
-                <span className="text-[12px] font-medium">{value}</span>
+              <div key={label} className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0">
+                <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+                <span className="text-[13px] font-semibold text-right max-w-[60%] truncate">{value}</span>
               </div>
             ))}
           </dl>
@@ -300,30 +381,30 @@ export function ReservationDetail({ reservation, restaurantId, onClose }: Props)
       </Tabs>
 
       {/* Action buttons */}
-      <div className="px-4 py-3 border-t border-border bg-background">
+      <div className="px-4 py-3 border-t border-border bg-background/95 backdrop-blur-sm">
         <div className="flex gap-2 flex-wrap">
           {reservation.status === 'CONFIRMED' && (
-            <Button size="sm" className="flex-1 h-8 text-[12px] gap-1.5 bg-green-500 hover:bg-green-600 text-white"
+            <Button size="sm" className="flex-1 h-11 text-[13px] gap-1.5 font-semibold bg-green-600 hover:bg-green-700 text-white"
               onClick={() => handleStatus('CHECKED_IN')} disabled={updateStatus.isPending}>
-              <LogIn className="w-3.5 h-3.5" />Check-in
+              <LogIn className="w-4 h-4" />Check-in
             </Button>
           )}
           {reservation.status === 'CHECKED_IN' && (
-            <Button size="sm" className="flex-1 h-8 text-[12px] gap-1.5" variant="secondary"
+            <Button size="sm" className="flex-1 h-11 text-[13px] gap-1.5 font-semibold" variant="secondary"
               onClick={() => handleStatus('FINISHED')} disabled={updateStatus.isPending}>
-              <CheckCircle className="w-3.5 h-3.5" />Finalizar
+              <CheckCircle className="w-4 h-4" />Finalizar
             </Button>
           )}
           {reservation.status === 'CONFIRMED' && (
-            <Button size="sm" className="h-8 text-[12px] gap-1.5" variant="outline"
+            <Button size="sm" className="h-11 text-[13px] gap-1.5 font-semibold" variant="outline"
               onClick={() => handleStatus('NO_SHOW')} disabled={updateStatus.isPending}>
-              <AlertTriangle className="w-3.5 h-3.5" />No-show
+              <AlertTriangle className="w-4 h-4" />No-show
             </Button>
           )}
           {['PENDING', 'CONFIRMED', 'PENDING_PAYMENT'].includes(reservation.status) && (
-            <Button size="sm" className="h-8 text-[12px] gap-1.5" variant="outline"
+            <Button size="sm" className="h-11 text-[13px] gap-1.5 font-semibold" variant="outline"
               onClick={() => handleStatus('CANCELLED')} disabled={updateStatus.isPending}>
-              <XCircle className="w-3.5 h-3.5" />Cancelar
+              <XCircle className="w-4 h-4" />Cancelar
             </Button>
           )}
         </div>

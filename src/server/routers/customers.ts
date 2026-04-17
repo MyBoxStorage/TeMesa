@@ -131,6 +131,15 @@ export const customersRouter = router({
       return customer
     }),
 
+  findByPhone: staffProcedure
+    .input(z.object({ restaurantId: z.string(), phone: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.customer.findUnique({
+        where: { restaurantId_phone: { restaurantId: input.restaurantId, phone: input.phone } },
+        select: { id: true, name: true, noShowCount: true, visitCount: true, reliabilityScore: true, tags: true },
+      })
+    }),
+
   deleteData: ownerProcedure
     .input(z.object({ restaurantId: z.string(), customerId: z.string() }))
     .mutation(async ({ ctx, input }): Promise<CustomerDTO> => {

@@ -60,7 +60,9 @@ export async function sendNotification(params: {
     tableArea: '',
     confirmUrl,
     cancelUrl,
-    reviewUrl: `${appUrl}`,
+    reviewUrl: reservation.confirmToken
+      ? `${appUrl}/avaliar/${reservation.confirmToken}`
+      : `${appUrl}`,
   }
 
   const templates = await prisma.notificationTemplate.findMany({

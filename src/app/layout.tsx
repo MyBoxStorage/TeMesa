@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Figtree } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,18 @@ export const metadata: Metadata = {
   title: "TeMesa",
   description: "SaaS white-label de gestão de reservas para restaurantes",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TeMesa",
+  },
+  icons: {
+    apple: "/icon-192.png",
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

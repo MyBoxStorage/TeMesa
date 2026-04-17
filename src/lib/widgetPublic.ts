@@ -59,21 +59,51 @@ export async function getWidgetAvailability(params: { slug: string; date: string
   const takenByShift = new Map<string, number>()
   for (const c of counts) if (c.shiftId) takenByShift.set(c.shiftId, c._sum.partySize ?? 0)
 
-  return shifts
-    .map((s) => {
-      const taken = takenByShift.get(s.id) ?? 0
-      const max = s.maxCapacity ?? 0
-      const available = max > 0 ? Math.max(0, max - taken) : 0
-      return {
+  const SLOT_INTERVAL_MIN = 60 // 1 horário por hora
+
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    return h * 60 + (m ?? 0)
+  }
+  const fromMin = (min: number) => {
+    const h = Math.floor(min / 60)
+    const m = min % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+
+  const result: Array<{
+    shiftId: string
+    shiftName: string
+    startTime: string
+    endTime: string
+    area: null
+    availableSeats: number
+  }> = []
+
+  for (const s of shifts) {
+    const taken = takenByShift.get(s.id) ?? 0
+    const max = s.maxCapacity ?? 0
+    const available = max > 0 ? Math.max(0, max - taken) : 0
+    if (available < params.partySize) continue
+
+    const shiftStart = toMin(s.startTime)
+    const shiftEnd   = toMin(s.endTime)
+
+    // Gera slots a cada SLOT_INTERVAL_MIN; o último slot começa
+    // no mínimo SLOT_INTERVAL_MIN antes do fim do turno.
+    for (let t = shiftStart; t <= shiftEnd - SLOT_INTERVAL_MIN; t += SLOT_INTERVAL_MIN) {
+      result.push({
         shiftId: s.id,
         shiftName: s.name,
-        startTime: s.startTime,
+        startTime: fromMin(t),
         endTime: s.endTime,
-        area: null as string | null,
+        area: null,
         availableSeats: available,
-      }
-    })
-    .filter((x) => x.availableSeats >= params.partySize)
+      })
+    }
+  }
+
+  return result
 }
 
 export async function createWidgetReservation(params: {

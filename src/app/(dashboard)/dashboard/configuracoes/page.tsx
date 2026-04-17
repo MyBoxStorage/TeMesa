@@ -1,5 +1,9 @@
 'use client'
 
+import Link from 'next/link'
+import {
+  Shield, Building2, Palette, Clock, CalendarDays, Bell, CreditCard, Tags, UtensilsCrossed, Plug,
+} from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ConfigGeral } from '@/components/configuracoes/config-geral'
 import { ConfigTema } from '@/components/configuracoes/config-tema'
@@ -10,18 +14,18 @@ import { ConfigAutoTags } from '@/components/configuracoes/config-autotags'
 import { ConfigGarcons } from '@/components/configuracoes/config-garcons'
 import { ConfigIntegracao } from '@/components/configuracoes/config-integracao'
 import { ConfigPagamento } from '@/components/configuracoes/config-pagamento'
-import { useDashboard } from '../layout'
+import { useDashboard } from '../dashboard-ctx'
 
 const TABS = [
-  ['geral',           'Geral'],
-  ['tema',            'Tema'],
-  ['turnos',          'Turnos'],
-  ['disponibilidade', 'Disponibilidade'],
-  ['notificacoes',    'Notificações'],
-  ['pagamento',       'Pagamento'],
-  ['autotags',        'Auto-Tags'],
-  ['garcons',         'Garçons'],
-  ['integracao',      'Integração'],
+  ['geral',           'Geral',           Building2],
+  ['tema',            'Tema',            Palette],
+  ['turnos',          'Turnos',          Clock],
+  ['disponibilidade', 'Disponibilidade', CalendarDays],
+  ['notificacoes',    'Notificações',    Bell],
+  ['pagamento',       'Pagamento',       CreditCard],
+  ['autotags',        'Auto-Tags',       Tags],
+  ['garcons',         'Garçons',         UtensilsCrossed],
+  ['integracao',      'Integração',      Plug],
 ] as const
 
 export default function ConfiguracoesPage() {
@@ -33,13 +37,27 @@ export default function ConfiguracoesPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-[18px] font-semibold mb-6">Configurações</h1>
 
+      <div className="mb-5">
+        <Link
+          href="/dashboard/configuracoes/protecao-noshow"
+          className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm hover:bg-muted/40 transition-colors"
+        >
+          <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="font-medium">Proteção No-Show (add-on)</p>
+            <p className="text-[11px] text-muted-foreground">Sinal Pix e posicionamento do produto — R$49/mês</p>
+          </div>
+        </Link>
+      </div>
+
       <Tabs defaultValue="geral" orientation="vertical" className="flex gap-6">
-        <TabsList className="flex flex-col h-auto w-44 shrink-0 bg-muted/30 p-1.5 rounded-xl items-start gap-0.5">
-          {TABS.map(([value, label]) => (
+        <TabsList className="flex flex-col h-auto w-52 shrink-0 bg-muted/40 p-1.5 rounded-xl items-stretch gap-0.5">
+          {TABS.map(([value, label, Icon]) => (
             <TabsTrigger
               key={value} value={value}
-              className="w-full justify-start text-[13px] px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg"
+              className="group w-full justify-start gap-2.5 text-[13px] px-3 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg"
             >
+              <Icon className="w-4 h-4 shrink-0 text-muted-foreground group-data-[state=active]:text-foreground" />
               {label}
             </TabsTrigger>
           ))}

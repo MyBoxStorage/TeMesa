@@ -48,15 +48,15 @@ export function DashboardHeader({
   const currentRestaurant = restaurants.find(r => r.id === selectedRestaurantId)
 
   return (
-    <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
+    <header className="h-16 flex items-center gap-4 px-5 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
 
       {/* Restaurant selector */}
       {restaurants.length > 1 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors max-w-[160px]">
+            <button className="flex items-center gap-2 text-[14px] font-semibold text-foreground/90 hover:text-foreground transition-colors max-w-[200px]">
               <span className="truncate">{currentRestaurant?.name ?? 'Selecionar'}</span>
-              <ChevronDown className="w-3 h-3 shrink-0" />
+              <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
@@ -76,7 +76,7 @@ export function DashboardHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <span className="text-[13px] font-medium text-muted-foreground hidden sm:block truncate max-w-[140px]">
+        <span className="text-[14px] font-semibold text-foreground/90 hidden sm:block truncate max-w-[200px]">
           {currentRestaurant?.name ?? 'Meu Restaurante'}
         </span>
       )}
@@ -84,14 +84,23 @@ export function DashboardHeader({
       <div className="hidden sm:block w-px h-4 bg-border" />
 
       {/* Date navigator */}
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDateChange(subDays(date, 1))}>
-          <ChevronLeft className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-1.5">
+        {!isToday && (
+          <button
+            type="button"
+            onClick={() => onDateChange(new Date())}
+            className="px-2 py-1 text-[10px] font-bold rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-all animate-pulse mr-1"
+          >
+            Hoje
+          </button>
+        )}
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onDateChange(subDays(date, 1))}>
+          <ChevronLeft className="w-4 h-4" />
         </Button>
         <button
           onClick={() => onDateChange(new Date())}
           className={cn(
-            'px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors min-w-[120px] text-center',
+            'px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors min-w-[132px] text-center',
             isToday ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
           )}
         >
@@ -99,15 +108,15 @@ export function DashboardHeader({
             ? `Hoje — ${format(date, 'dd MMM', { locale: ptBR })}`
             : format(date, "EEE, dd 'de' MMM", { locale: ptBR })}
         </button>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDateChange(addDays(date, 1))}>
-          <ChevronRight className="w-3.5 h-3.5" />
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onDateChange(addDays(date, 1))}>
+          <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
 
       {/* Shift selector */}
       {shifts.length > 0 && (
         <Select value={shift} onValueChange={onShiftChange}>
-          <SelectTrigger className="h-7 text-[12px] w-auto min-w-[100px] border-border">
+          <SelectTrigger className="h-8 text-[12px] w-auto min-w-[108px] border-border">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -121,10 +130,10 @@ export function DashboardHeader({
 
       <div className="flex-1" />
 
-      <Button size="icon" variant="ghost" className="h-7 w-7 relative">
-        <Bell className="w-3.5 h-3.5" />
+      <Button size="icon" variant="ghost" className="h-8 w-8 relative">
+        <Bell className="w-4 h-4" />
       </Button>
-      <UserButton appearance={{ elements: { avatarBox: 'w-7 h-7', userButtonTrigger: 'focus:shadow-none' } }} />
+      <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8', userButtonTrigger: 'focus:shadow-none' } }} />
     </header>
   )
 }
