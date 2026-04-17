@@ -1,11 +1,29 @@
 import { TRPCError } from '@trpc/server'
 import { nanoid } from 'nanoid'
-import type { ReservationStatus } from '@prisma/client'
+import type { Prisma, ReservationStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
+import { sendWidgetReservationEvents } from '@/lib/bcconnect'
 import { sendNotification } from '@/lib/notifications'
 import { createPixOrder } from '@/lib/pagarme'
 import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt } from '@/lib/reservationRules'
+
+function widgetCustomerPreferencesJson(params: {
+  dietaryNotes?: string
+  originType?: string
+  visitFrequency?: string
+  consumptionPreferences?: string[]
+  referralSource?: string
+}): Prisma.InputJsonValue | undefined {
+  const o: Record<string, unknown> = {}
+  if (params.dietaryNotes) o.dietaryNotes = params.dietaryNotes
+  if (params.originType) o.originType = params.originType
+  if (params.visitFrequency) o.visitFrequency = params.visitFrequency
+  if (params.consumptionPreferences?.length) o.consumptionPreferences = params.consumptionPreferences
+  if (params.referralSource) o.referralSource = params.referralSource
+  if (Object.keys(o).length === 0) return undefined
+  return o as Prisma.InputJsonValue
+}
 
 export interface PrepaymentInfo {
   amountCents: number
@@ -69,10 +87,15 @@ export async function createWidgetReservation(params: {
   occasion?: string
   dietaryNotes?: string
   lgpdConsent: boolean
+  originType?: string
+  visitFrequency?: string
+  consumptionPreferences?: string[]
+  referralSource?: string
+  optinMarketing?: boolean
 }): Promise<{ reservationId: string; status: ReservationStatus; prepayment?: PrepaymentInfo }> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.slug },
-    select: { id: true, name: true, prepaymentConfig: true },
+    select: { id: true, name: true, slug: true, prepaymentConfig: true },
   })
   if (!restaurant) throw new TRPCError({ code: 'NOT_FOUND' })
 
@@ -98,6 +121,13 @@ export async function createWidgetReservation(params: {
   if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'Já existe uma reserva ativa para este telefone' })
 
   const token = nanoid(32)
+  const prefsJson = widgetCustomerPreferencesJson({
+    dietaryNotes: params.dietaryNotes,
+    originType: params.originType,
+    visitFrequency: params.visitFrequency,
+    consumptionPreferences: params.consumptionPreferences,
+    referralSource: params.referralSource,
+  })
 
   // Upsert customer so every widget reservation creates/updates a CRM profile
   const customer = await prisma.customer.upsert({
@@ -107,7 +137,7 @@ export async function createWidgetReservation(params: {
       email: params.guestEmail,
       lgpdConsent: params.lgpdConsent,
       lgpdConsentAt: params.lgpdConsent ? new Date() : undefined,
-      preferences: params.dietaryNotes ? { dietaryNotes: params.dietaryNotes } : undefined,
+      preferences: prefsJson ?? undefined,
     },
     create: {
       restaurantId: restaurant.id,
@@ -116,7 +146,7 @@ export async function createWidgetReservation(params: {
       email: params.guestEmail,
       lgpdConsent: params.lgpdConsent,
       lgpdConsentAt: params.lgpdConsent ? new Date() : undefined,
-      preferences: params.dietaryNotes ? { dietaryNotes: params.dietaryNotes } : undefined,
+      preferences: prefsJson ?? undefined,
       tags: [],
     },
   })
@@ -139,12 +169,49 @@ export async function createWidgetReservation(params: {
       confirmTokenExpiresAt: confirmTokenExpiresAt(params.date),
       lgpdConsent: params.lgpdConsent,
       lgpdConsentAt: params.lgpdConsent ? new Date() : null,
+      originType: params.originType ?? null,
+      visitFrequency: params.visitFrequency ?? null,
+      consumptionPreferences: params.consumptionPreferences ?? [],
+      referralSource: params.referralSource ?? null,
+      optinMarketing: params.optinMarketing ?? false,
       statusHistory: { create: { fromStatus: null, toStatus: initialStatus, changedBy: 'SYSTEM' } },
     },
     include: { restaurant: true, customer: true },
   })
 
   await sendNotification({ restaurantId: reservation.restaurantId, trigger: 'RESERVATION_CREATED', reservation })
+
+  // Dispara eventos BC Connect — fire-and-forget, nunca bloqueia o fluxo
+  if (reservation.lgpdConsent) {
+    const shiftRecord = await prisma.shift.findUnique({
+      where: { id: params.shiftId },
+      select: { name: true },
+    })
+    sendWidgetReservationEvents({
+      restaurantId: restaurant.id,
+      restaurantSlug: params.slug,
+      restaurantName: restaurant.name,
+      guest: {
+        name: params.guestName,
+        phone: params.guestPhone,
+        email: params.guestEmail,
+      },
+      lgpdConsent: reservation.lgpdConsent,
+      optinMarketing: params.optinMarketing ?? false,
+      reservation: {
+        id: reservation.id,
+        partySize: params.partySize,
+        date: params.date.toISOString(),
+        shiftName: shiftRecord?.name ?? params.shiftId,
+        occasion: params.occasion,
+        originType: params.originType,
+        visitFrequency: params.visitFrequency,
+        consumptionPreferences: params.consumptionPreferences,
+        dietaryNotes: params.dietaryNotes,
+        referralSource: params.referralSource,
+      },
+    }).catch((err) => console.warn('[BC Connect] Falha silenciosa:', err))
+  }
 
   // If prepayment is active, create a Pix order via Pagar.me
   if (prepaymentActive && cfg) {

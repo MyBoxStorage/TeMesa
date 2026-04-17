@@ -58,6 +58,11 @@ export const widgetRouter = router({
         occasion: z.string().optional(),
         dietaryNotes: z.string().optional(),
         lgpdConsent: z.boolean(),
+        originType: z.string().optional(),
+        visitFrequency: z.string().optional(),
+        consumptionPreferences: z.array(z.string()).optional(),
+        referralSource: z.string().optional(),
+        optinMarketing: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -73,6 +78,11 @@ export const widgetRouter = router({
         occasion: input.occasion,
         dietaryNotes: input.dietaryNotes,
         lgpdConsent: input.lgpdConsent,
+        originType: input.originType,
+        visitFrequency: input.visitFrequency,
+        consumptionPreferences: input.consumptionPreferences,
+        referralSource: input.referralSource,
+        optinMarketing: input.optinMarketing,
       })
     }),
 

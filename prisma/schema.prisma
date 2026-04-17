@@ -213,6 +213,11 @@ model Reservation {
   postVisitSentAt       DateTime?
   lgpdConsent           Boolean           @default(false)
   lgpdConsentAt         DateTime?
+  originType            String?
+  visitFrequency        String?
+  consumptionPreferences String[]         @default([])
+  referralSource        String?
+  optinMarketing        Boolean           @default(false)
   bcConnectSent         Boolean           @default(false)
   statusHistory         ReservationStatusHistory[]
   prepayment            PrepaymentRecord?

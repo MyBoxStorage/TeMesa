@@ -141,6 +141,11 @@ CREATE TABLE "Reservation" (
   "confirmTokenExpiresAt" TIMESTAMP(3),
   "lgpdConsent" BOOLEAN NOT NULL DEFAULT false,
   "lgpdConsentAt" TIMESTAMP(3),
+  "originType" TEXT,
+  "visitFrequency" TEXT,
+  "consumptionPreferences" TEXT[] NOT NULL DEFAULT '{}',
+  "referralSource" TEXT,
+  "optinMarketing" BOOLEAN NOT NULL DEFAULT false,
   "bcConnectSent" BOOLEAN NOT NULL DEFAULT false,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -266,3 +271,10 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
 ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "reminder24hSentAt" TIMESTAMPTZ;
 ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "reminder2hSentAt" TIMESTAMPTZ;
 ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "postVisitSentAt" TIMESTAMPTZ;
+
+-- Widget quiz / BC Connect enrichment (run in Supabase if table already exists)
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "originType" TEXT;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "visitFrequency" TEXT;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "consumptionPreferences" TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "referralSource" TEXT;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "optinMarketing" BOOLEAN NOT NULL DEFAULT false;
