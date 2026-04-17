@@ -115,6 +115,7 @@ model Restaurant {
   coverUrl           String?
   themeConfig        Json?
   operatingHours     Json
+  settings           Json?
   prepaymentConfig   Json?
   onboardingStatus   Json      @default("{\"restaurant\":false,\"shifts\":false,\"tables\":false,\"notifications\":false}")
   bcConnectPartnerId String?
@@ -228,6 +229,12 @@ model Reservation {
   server                Server?           @relation(fields: [serverId], references: [id])
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
+
+  @@index([restaurantId, date])
+  @@index([restaurantId, status])
+  @@index([guestPhone])
+  @@index([confirmToken])
+  @@index([restaurantId, date, status])
 }
 
 model ReservationStatusHistory {
@@ -253,6 +260,9 @@ model PrepaymentRecord {
   refundedAt     DateTime?
   expiresAt      DateTime?
   reservation    Reservation   @relation(fields: [reservationId], references: [id])
+
+  @@index([status, expiresAt])
+  @@index([pagarmeOrderId])
 }
 
 model Customer {
@@ -276,6 +286,8 @@ model Customer {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   @@unique([restaurantId, phone])
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, reliabilityScore])
 }
 
 model WaitlistEntry {
@@ -370,5 +382,6 @@ model RateLimitBucket {
   count   Int      @default(1)
   resetAt DateTime
 
+  @@index([resetAt])
   @@map("rate_limit_buckets")
 }

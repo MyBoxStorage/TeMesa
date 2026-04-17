@@ -36,6 +36,11 @@ export async function sendNotification(params: {
 }): Promise<void> {
   const { trigger, reservation, restaurantId } = params
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  if (!appUrl || appUrl.includes('localhost')) {
+    console.warn(
+      '[Notifications] NEXT_PUBLIC_APP_URL não está configurado para produção. Links de confirmação estarão incorretos.'
+    )
+  }
 
   const confirmUrl = reservation.confirmToken
     ? `${appUrl}/confirmar/${reservation.confirmToken}`

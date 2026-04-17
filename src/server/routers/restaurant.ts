@@ -204,4 +204,30 @@ export const restaurantRouter = router({
         select: { slug: true, name: true },
       })
     }),
+
+  getBlockedDates: staffProcedure
+    .input(z.object({ restaurantId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const r = await ctx.prisma.restaurant.findUnique({
+        where: { id: input.restaurantId },
+        select: { settings: true },
+      })
+      const settings = (r?.settings ?? {}) as Record<string, unknown>
+      return (settings.blockedDates ?? []) as string[]
+    }),
+
+  setBlockedDates: ownerProcedure
+    .input(z.object({ restaurantId: z.string(), blockedDates: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const r = await ctx.prisma.restaurant.findUnique({
+        where: { id: input.restaurantId },
+        select: { settings: true },
+      })
+      const existing = ((r?.settings ?? {}) as Record<string, unknown>)
+      const next = { ...existing, blockedDates: input.blockedDates }
+      return ctx.prisma.restaurant.update({
+        where: { id: input.restaurantId },
+        data: { settings: next as any },
+      })
+    }),
 })

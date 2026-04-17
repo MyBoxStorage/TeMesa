@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/crypto'
+import { resolveBcLeadEmail, formatPhoneForBc } from '@/lib/bcconnect'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,25 +26,28 @@ export async function POST(req: NextRequest) {
     })
 
     if (!restaurant?.bcConnectPartnerId || !restaurant?.bcConnectApiKey) {
-      // BC Connect não configurado — silencioso
       return NextResponse.json({ ok: true })
     }
 
     const apiKey = decrypt(restaurant.bcConnectApiKey)
+    const partnerId = restaurant.bcConnectPartnerId
 
     const payload = {
-      event: 'OPTIN_ACCEPTED',
-      guestPhone: body.guestPhone ?? null,
-      guestEmail: body.guestEmail ?? null,
-      guestName: body.guestName ?? null,
-      consentType: 'LGPD_WHATSAPP',
-      restaurantSlug: body.restaurantSlug,
-      source: 'WIDGET',
-      acceptedAt: new Date().toISOString(),
+      eventType: 'SIGNUP' as const,
+      occurredAt: new Date().toISOString(),
+      lead: {
+        email: resolveBcLeadEmail({
+          partnerId,
+          phone: body.guestPhone ?? '',
+          email: body.guestEmail,
+        }),
+        name: body.guestName?.trim() || undefined,
+        phone: body.guestPhone ? formatPhoneForBc(body.guestPhone) : undefined,
+      },
+      optinAccepted: true,
     }
 
-    // Fire-and-forget: não awaita a resposta do BC Connect
-    fetch(`${BC_WEBHOOK_URL}/api/webhook/partner/${restaurant.bcConnectPartnerId}`, {
+    fetch(`${BC_WEBHOOK_URL}/api/webhook/partner/${partnerId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
       body: JSON.stringify(payload),
@@ -53,6 +57,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.warn('[BC Connect OPTIN] Erro:', (err as Error).message)
-    return NextResponse.json({ ok: true }) // Sempre 200 — não bloquear o cliente
+    return NextResponse.json({ ok: true })
   }
 }

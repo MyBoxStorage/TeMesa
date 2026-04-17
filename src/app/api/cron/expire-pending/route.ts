@@ -4,7 +4,10 @@ import { prisma } from '@/lib/prisma'
 
 function isCronAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET ?? ''
-  if (!secret) return true
+  if (!secret) {
+    console.error('[Cron] CRON_SECRET não configurado — requisição bloqueada')
+    return false
+  }
   const header = req.headers.get('authorization') ?? ''
   return header === `Bearer ${secret}`
 }

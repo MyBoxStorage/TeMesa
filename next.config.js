@@ -9,9 +9,6 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   turbopack: {
     resolveAlias: {
       // Garante que o Turbopack sempre resolva tailwindcss a partir

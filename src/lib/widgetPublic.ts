@@ -213,14 +213,31 @@ export async function createWidgetReservation(params: {
     }).catch((err) => console.warn('[BC Connect] Falha silenciosa:', err))
   }
 
-  // If prepayment is active, create a Pix order via Pagar.me
+  // If prepayment is active, create a Pix order via Pagar.me (valor fixo em reais → centavos)
   if (prepaymentActive && cfg) {
-    const type = String(cfg.prepayment_type ?? 'VALOR_FIXO')
     const amount = Number(cfg.prepayment_amount ?? 0)
-    let amountCents = 0
-    if (type === 'POR_PESSOA') amountCents = Math.round(amount * params.partySize * 100)
-    else if (type === 'PERCENTUAL') amountCents = Math.round(amount)
-    else amountCents = Math.round(amount * 100)
+    const amountCents = Math.round(amount * 100)
+
+    if (amountCents <= 0) {
+      console.warn(
+        `[Prepayment] amountCents inválido (${amountCents}) para restaurante ${restaurant.id} — tratando como sem pagamento`
+      )
+      const confirmed = await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: {
+          status: 'CONFIRMED',
+          statusHistory: {
+            create: {
+              fromStatus: 'PENDING_PAYMENT',
+              toStatus: 'CONFIRMED',
+              changedBy: 'SYSTEM',
+              reason: 'PREPAYMENT_AMOUNT_INVALID',
+            },
+          },
+        },
+      })
+      return { reservationId: reservation.id, status: confirmed.status }
+    }
 
     const expirationMinutes = Number(cfg.prepayment_expiry_minutes ?? 30)
     const pixExpiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000)
@@ -257,7 +274,7 @@ export async function createWidgetReservation(params: {
           prepaymentRecordId: record.id,
         },
       }
-    } catch (err) {
+    } catch {
       // Pagar.me failure: cancel reservation and propagate error
       await prisma.reservation.update({
         where: { id: reservation.id },

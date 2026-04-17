@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ConfigGeral } from '@/components/configuracoes/config-geral'
 import { ConfigTema } from '@/components/configuracoes/config-tema'
 import { ConfigTurnos } from '@/components/configuracoes/config-turnos'
+import { ConfigDisponibilidade } from '@/components/configuracoes/config-disponibilidade'
 import { ConfigNotificacoes } from '@/components/configuracoes/config-notificacoes'
 import { ConfigAutoTags } from '@/components/configuracoes/config-autotags'
 import { ConfigGarcons } from '@/components/configuracoes/config-garcons'
@@ -12,14 +13,15 @@ import { ConfigPagamento } from '@/components/configuracoes/config-pagamento'
 import { useDashboard } from '../layout'
 
 const TABS = [
-  ['geral',        'Geral'],
-  ['tema',         'Tema'],
-  ['turnos',       'Turnos'],
-  ['notificacoes', 'Notificações'],
-  ['pagamento',    'Pagamento'],
-  ['autotags',     'Auto-Tags'],
-  ['garcons',      'Garçons'],
-  ['integracao',   'Integração'],
+  ['geral',           'Geral'],
+  ['tema',            'Tema'],
+  ['turnos',          'Turnos'],
+  ['disponibilidade', 'Disponibilidade'],
+  ['notificacoes',    'Notificações'],
+  ['pagamento',       'Pagamento'],
+  ['autotags',        'Auto-Tags'],
+  ['garcons',         'Garçons'],
+  ['integracao',      'Integração'],
 ] as const
 
 export default function ConfiguracoesPage() {
@@ -47,6 +49,9 @@ export default function ConfiguracoesPage() {
           <TabsContent value="geral">        <ConfigGeral        restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="tema">         <ConfigTema         restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="turnos">       <ConfigTurnos       restaurantId={restaurantId} /></TabsContent>
+          <TabsContent value="disponibilidade">
+            <ConfigDisponibilidade restaurantId={restaurantId} />
+          </TabsContent>
           <TabsContent value="notificacoes"> <ConfigNotificacoes restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="pagamento">    <ConfigPagamento    restaurantId={restaurantId} /></TabsContent>
           <TabsContent value="autotags">     <ConfigAutoTags     restaurantId={restaurantId} /></TabsContent>

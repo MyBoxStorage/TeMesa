@@ -38,11 +38,13 @@ CREATE TABLE "Restaurant" (
   "coverUrl" TEXT,
   "themeConfig" JSONB,
   "operatingHours" JSONB NOT NULL,
+  "settings" JSONB,
   "prepaymentConfig" JSONB,
   "onboardingStatus" JSONB NOT NULL DEFAULT '{"restaurant":false,"shifts":false,"tables":false,"notifications":false}',
   "bcConnectPartnerId" TEXT,
   "bcConnectApiKey" TEXT,
   "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "plan" TEXT NOT NULL DEFAULT 'GRATUITO',
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

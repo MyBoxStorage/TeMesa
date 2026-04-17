@@ -24,8 +24,7 @@ import { cn } from '@/lib/utils'
 type Step =
   | 'welcome'
   | 'occasion'
-  | 'config'
-  | 'slots'
+  | 'schedule'
   | 'identity'
   | 'profile'
   | 'preferences'
@@ -34,7 +33,7 @@ type Step =
   | 'success'
 
 const STEPS_ORDERED: Step[] = [
-  'welcome', 'occasion', 'config', 'slots',
+  'welcome', 'occasion', 'schedule',
   'identity', 'profile', 'preferences', 'referral',
 ]
 
@@ -86,14 +85,17 @@ const T = {
     occ_birthday: 'Aniversário', occ_romantic: 'Romântico', occ_corporate: 'Corporativo',
     occ_family: 'Família', occ_show: 'Show / Evento', occ_happyhour: 'Happy Hour',
     occ_just: 'Curtindo mesmo', occ_other: 'Outro motivo',
-    step_config: 'Quantas pessoas e qual data?',
-    guests: 'Pessoas',
-    date: 'Data',
-    today: 'Hoje', tomorrow: 'Amanhã', otherDate: 'Outra data:',
-    seeSlots: 'Ver horários →',
-    step_slots: 'Escolha um horário',
-    noAvailability: 'Sem disponibilidade', tryOther: 'Tente outra data ou número de pessoas',
-    changeConfig: 'Alterar',
+    step_config: 'Quando você vai?',
+    ps_solo: 'Só eu', ps_two: '2 pessoas', ps_small: '3-4 pessoas',
+    ps_medium: '5-6 pessoas', ps_large: '7-10 pessoas', ps_xl: 'Grande grupo',
+    ps_xl_sub: 'Entre em contato diretamente',
+    lbl_partysize: 'QUANTOS VÊM AÍ?',
+    lbl_date: 'ESCOLHA O DIA',
+    lbl_time: 'ESCOLHA O HORÁRIO',
+    closed: 'Fechado',
+    blocked: 'Bloqueado',
+    no_slots_date: 'Sem horários disponíveis para este dia.',
+    pick_date_first: 'Selecione um dia para ver os horários',
     step_identity: 'Seus dados de contato',
     namePlaceholder: 'Seu nome completo *',
     phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
@@ -147,13 +149,17 @@ const T = {
     occ_birthday: 'Birthday', occ_romantic: 'Romantic', occ_corporate: 'Corporate',
     occ_family: 'Family', occ_show: 'Show / Event', occ_happyhour: 'Happy Hour',
     occ_just: 'Just hanging out', occ_other: 'Other',
-    step_config: 'How many guests and which date?',
-    guests: 'Guests', date: 'Date',
-    today: 'Today', tomorrow: 'Tomorrow', otherDate: 'Other date:',
-    seeSlots: 'See times →',
-    step_slots: 'Choose a time',
-    noAvailability: 'No availability', tryOther: 'Try a different date or party size',
-    changeConfig: 'Change',
+    step_config: 'When are you coming?',
+    ps_solo: 'Just me', ps_two: '2 people', ps_small: '3-4 people',
+    ps_medium: '5-6 people', ps_large: '7-10 people', ps_xl: 'Large group',
+    ps_xl_sub: 'Contact us directly',
+    lbl_partysize: 'HOW MANY?',
+    lbl_date: 'CHOOSE A DAY',
+    lbl_time: 'CHOOSE A TIME',
+    closed: 'Closed',
+    blocked: 'Unavailable',
+    no_slots_date: 'No available times for this day.',
+    pick_date_first: 'Select a day to see available times',
     step_identity: 'Your contact details',
     namePlaceholder: 'Your full name *',
     phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
@@ -205,13 +211,17 @@ const T = {
     occ_birthday: 'Cumpleaños', occ_romantic: 'Romántico', occ_corporate: 'Corporativo',
     occ_family: 'Familia', occ_show: 'Show / Evento', occ_happyhour: 'Happy Hour',
     occ_just: 'Solo a disfrutar', occ_other: 'Otro motivo',
-    step_config: '¿Cuántas personas y qué fecha?',
-    guests: 'Personas', date: 'Fecha',
-    today: 'Hoy', tomorrow: 'Mañana', otherDate: 'Otra fecha:',
-    seeSlots: 'Ver horarios →',
-    step_slots: 'Elige un horario',
-    noAvailability: 'Sin disponibilidad', tryOther: 'Intenta otra fecha o número de personas',
-    changeConfig: 'Cambiar',
+    step_config: '¿Cuándo vas a venir?',
+    ps_solo: 'Solo yo', ps_two: '2 personas', ps_small: '3-4 personas',
+    ps_medium: '5-6 personas', ps_large: '7-10 personas', ps_xl: 'Grupo grande',
+    ps_xl_sub: 'Contáctanos directamente',
+    lbl_partysize: '¿CUÁNTOS SON?',
+    lbl_date: 'ELIGE EL DÍA',
+    lbl_time: 'ELIGE EL HORARIO',
+    closed: 'Cerrado',
+    blocked: 'No disponible',
+    no_slots_date: 'Sin horarios disponibles para este día.',
+    pick_date_first: 'Selecciona un día para ver los horarios',
     step_identity: 'Tus datos de contacto',
     namePlaceholder: 'Tu nombre completo *',
     phonePlaceholder: 'WhatsApp: (00) 00000-0000 *',
@@ -311,6 +321,8 @@ interface Restaurant {
   id: string; name: string; slug: string
   logoUrl?: string | null; coverUrl?: string | null
   themeConfig?: Record<string, unknown> | null
+  activeDaysOfWeek?: number[]
+  blockedDates?: string[]
 }
 
 const GUEST_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -333,7 +345,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
 
   const { data: slots, isLoading: slotsLoading } = api.widget.getAvailableSlots.useQuery(
     { slug: restaurant.slug, date: form.date, partySize: form.partySize },
-    { enabled: step === 'slots' }
+    { enabled: step === 'schedule' && !!form.date && form.partySize > 0 }
   )
 
   const create = api.widget.createReservation.useMutation({
@@ -440,11 +452,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
   }
 
   // Datas rápidas
-  const quickDates = [
-    { value: today,                         label: t.today,    sub: format(new Date(), 'EEE', { locale: ptBR }) },
-    { value: tomorrow,                      label: t.tomorrow, sub: format(addDays(new Date(), 1), 'EEE', { locale: ptBR }) },
-    { value: format(addDays(new Date(), 2), 'yyyy-MM-dd'), label: format(addDays(new Date(), 2), 'dd MMM', { locale: ptBR }), sub: format(addDays(new Date(), 2), 'EEE', { locale: ptBR }) },
-  ]
+  // (removido) quickDates — era usado apenas no step antigo 'config'
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -522,11 +530,11 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   ] as const).map((o) => (
                     <SelectCard key={o.value} icon={o.icon} label={o.label} primary={primary}
                       selected={form.occasionType === o.value}
-                      onClick={() => { set('occasionType', o.value); setStep('config') }} />
+                      onClick={() => { set('occasionType', o.value); setStep('schedule') }} />
                   ))}
                 </div>
                 <div className="px-4 pb-4">
-                  <button onClick={() => setStep('config')} className="w-full text-xs text-zinc-600 hover:text-zinc-400 underline transition-colors">
+                  <button onClick={() => setStep('schedule')} className="w-full text-xs text-zinc-600 hover:text-zinc-400 underline transition-colors">
                     Pular →
                   </button>
                 </div>
@@ -534,138 +542,249 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
             </motion.div>
           )}
 
-          {/* ── CONFIG (grupo + data) ────────────────────────────────────── */}
-          {step === 'config' && (
-            <motion.div key="config" {...anim}>
+          {/* ── SCHEDULE (grupo + data + horários) ─────────────────────── */}
+          {step === 'schedule' && (
+            <motion.div key="schedule" {...anim}>
               <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+
+                {/* Header */}
                 <div className="flex items-center gap-3 p-4 border-b border-zinc-800">
-                  <button onClick={() => setStep('occasion')} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
+                  <button
+                    onClick={() => setStep('occasion')}
+                    className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                  >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <p className="text-sm font-semibold text-white flex-1 text-center pr-8">{t.step_config}</p>
+                  <p className="text-sm font-semibold text-white flex-1 text-center pr-8">
+                    {t.step_config}
+                  </p>
                 </div>
 
-                {/* Pessoas */}
-                <div className="p-5 border-b border-zinc-800">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">{t.guests}</span>
-                  </div>
-                  <div className="grid grid-cols-8 gap-1.5">
-                    {GUEST_OPTIONS.map((n) => (
-                      <button key={n} onClick={() => set('partySize', n)}
-                        className={cn('h-9 rounded-lg text-sm font-semibold transition-all',
-                          form.partySize === n ? 'text-white scale-105 shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white')}
-                        style={form.partySize === n ? { backgroundColor: primary } : {}}>
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                  {form.partySize === 8 && (
-                    <p className="text-xs text-zinc-500 mt-2 text-center">{t.contactForLargerGroups}</p>
-                  )}
-                </div>
+                <div className="overflow-y-auto max-h-[70vh] divide-y divide-zinc-800">
 
-                {/* Data */}
-                <div className="p-5 border-b border-zinc-800">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">{t.date}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {quickDates.map((d) => (
-                      <button key={d.value} onClick={() => set('date', d.value)}
-                        className={cn('py-2.5 px-3 rounded-xl text-center transition-all',
-                          form.date === d.value ? 'text-white scale-[1.02]' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700')}
-                        style={form.date === d.value ? { backgroundColor: primary } : {}}>
-                        <p className="text-sm font-semibold">{d.label}</p>
-                        <p className="text-[10px] opacity-70 capitalize">{d.sub}</p>
-                      </button>
-                    ))}
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors whitespace-nowrap">{t.otherDate}</span>
-                    <input type="date" value={form.date} min={today}
-                      onChange={(e) => set('date', e.target.value)}
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-zinc-500 transition-colors" />
-                  </label>
-                </div>
-
-                <div className="p-5">
-                  <button onClick={() => setStep('slots')}
-                    className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                    style={{ backgroundColor: primary, borderRadius: radius }}>
-                    {t.seeSlots}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── SLOTS ───────────────────────────────────────────────────── */}
-          {step === 'slots' && (
-            <motion.div key="slots" {...anim}>
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
-                <div className="flex items-center gap-3 p-4 border-b border-zinc-800">
-                  <button onClick={() => setStep('config')} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 text-center">
-                    <p className="text-sm font-semibold text-white">
-                      {form.date === today ? t.today : form.date === tomorrow ? t.tomorrow
-                        : format(new Date(form.date + 'T12:00'), "EEE, dd 'de' MMM", { locale: ptBR })}
+                  {/* ── Seção A: Tamanho do grupo ── */}
+                  <div className="p-4">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                      {t.lbl_partysize}
                     </p>
-                    <p className="text-xs text-zinc-500">{form.partySize} pessoa{form.partySize > 1 ? 's' : ''}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Só eu */}
+                      <button
+                        type="button"
+                        onClick={() => set('partySize', 1)}
+                        className={cn(
+                          'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.03] active:scale-[0.97]',
+                          form.partySize === 1
+                            ? 'text-white scale-[1.03] shadow-lg'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                        )}
+                        style={form.partySize === 1 ? { backgroundColor: primary, borderColor: primary } : {}}
+                      >
+                        <Users className="w-5 h-5 opacity-90" />
+                        <span className="text-[11px] font-semibold leading-tight">{t.ps_solo}</span>
+                      </button>
+
+                      {/* 2 pessoas */}
+                      <button
+                        type="button"
+                        onClick={() => set('partySize', 2)}
+                        className={cn(
+                          'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.03] active:scale-[0.97]',
+                          form.partySize === 2
+                            ? 'text-white scale-[1.03] shadow-lg'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                        )}
+                        style={form.partySize === 2 ? { backgroundColor: primary, borderColor: primary } : {}}
+                      >
+                        <Users className="w-5 h-5 opacity-90" />
+                        <span className="text-[11px] font-semibold leading-tight">{t.ps_two}</span>
+                      </button>
+
+                      {/* 3-4 pessoas */}
+                      <button
+                        type="button"
+                        onClick={() => set('partySize', 4)}
+                        className={cn(
+                          'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.03] active:scale-[0.97]',
+                          form.partySize === 4
+                            ? 'text-white scale-[1.03] shadow-lg'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                        )}
+                        style={form.partySize === 4 ? { backgroundColor: primary, borderColor: primary } : {}}
+                      >
+                        <Users className="w-5 h-5 opacity-90" />
+                        <span className="text-[11px] font-semibold leading-tight">{t.ps_small}</span>
+                      </button>
+
+                      {/* 5-6 pessoas */}
+                      <button
+                        type="button"
+                        onClick={() => set('partySize', 6)}
+                        className={cn(
+                          'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.03] active:scale-[0.97]',
+                          form.partySize === 6
+                            ? 'text-white scale-[1.03] shadow-lg'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                        )}
+                        style={form.partySize === 6 ? { backgroundColor: primary, borderColor: primary } : {}}
+                      >
+                        <Users className="w-5 h-5 opacity-90" />
+                        <span className="text-[11px] font-semibold leading-tight">{t.ps_medium}</span>
+                      </button>
+
+                      {/* 7-10 pessoas */}
+                      <button
+                        type="button"
+                        onClick={() => set('partySize', 10)}
+                        className={cn(
+                          'flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.03] active:scale-[0.97]',
+                          form.partySize === 10
+                            ? 'text-white scale-[1.03] shadow-lg'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                        )}
+                        style={form.partySize === 10 ? { backgroundColor: primary, borderColor: primary } : {}}
+                      >
+                        <Users className="w-5 h-5 opacity-90" />
+                        <span className="text-[11px] font-semibold leading-tight">{t.ps_large}</span>
+                      </button>
+
+                      {/* Grande grupo — desabilitado */}
+                      <div className="flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 border-zinc-800 text-center opacity-40 cursor-not-allowed bg-zinc-900">
+                        <Users className="w-5 h-5 text-zinc-600" />
+                        <span className="text-[11px] font-semibold text-zinc-500 leading-tight">{t.ps_xl}</span>
+                        <span className="text-[9px] text-zinc-600 leading-tight">{t.ps_xl_sub}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-8" />
+
+                  {/* ── Seção B: Grade de 14 dias ── */}
+                  <div className="p-4">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                      {t.lbl_date}
+                    </p>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {Array.from({ length: 14 }, (_, i) => {
+                        const d        = addDays(new Date(), i)
+                        const iso      = format(d, 'yyyy-MM-dd')
+                        const dayOfWeek = d.getDay() // 0=Dom … 6=Sáb
+                        const weekLabel = format(d, 'EEE', { locale: ptBR }).slice(0, 3)
+                        const dayNum    = format(d, 'd')
+
+                        const isClosed  = restaurant.activeDaysOfWeek
+                          ? !restaurant.activeDaysOfWeek.includes(dayOfWeek)
+                          : false
+                        const isBlocked = (restaurant.blockedDates ?? []).includes(iso)
+                        const isDisabled = isClosed || isBlocked
+                        const isSelected = form.date === iso
+
+                        return (
+                          <button
+                            key={iso}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              set('date', iso)
+                              set('selectedSlot', null)
+                            }}
+                            title={isClosed ? t.closed : isBlocked ? t.blocked : undefined}
+                            className={cn(
+                              'flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl border text-center transition-all',
+                              isDisabled
+                                ? 'border-zinc-800 bg-zinc-900 opacity-30 cursor-not-allowed'
+                                : isSelected
+                                  ? 'border-transparent text-white scale-105 shadow-lg'
+                                  : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500 hover:scale-[1.04]',
+                            )}
+                            style={isSelected && !isDisabled ? { backgroundColor: primary, borderColor: primary } : {}}
+                          >
+                            <span className="text-[9px] font-medium capitalize opacity-70">{weekLabel}</span>
+                            <span className="text-sm font-bold leading-none">{dayNum}</span>
+                            {isBlocked && !isClosed && (
+                              <span className="text-[7px] leading-none opacity-60">●</span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ── Seção C: Horários por turno ── */}
+                  <div className="p-4">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                      {t.lbl_time}
+                    </p>
+
+                    {!form.date ? (
+                      <p className="text-xs text-zinc-500 text-center py-4">{t.pick_date_first}</p>
+                    ) : slotsLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+                      </div>
+                    ) : !slots?.length ? (
+                      <p className="text-xs text-zinc-500 text-center py-4">{t.no_slots_date}</p>
+                    ) : (
+                      // Agrupar por shiftName
+                      (() => {
+                        const byShift = slots.reduce<Record<string, typeof slots>>((acc, s) => {
+                          if (!acc[s.shiftName]) acc[s.shiftName] = []
+                          acc[s.shiftName].push(s)
+                          return acc
+                        }, {})
+
+                        return (
+                          <div className="space-y-4">
+                            {Object.entries(byShift).map(([shiftName, shiftSlots]) => (
+                              <div key={shiftName}>
+                                <p className="text-[11px] font-semibold text-zinc-400 mb-2">{shiftName}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {shiftSlots.map((slot) => {
+                                    const isSel =
+                                      form.selectedSlot?.shiftId === slot.shiftId &&
+                                      form.selectedSlot?.startTime === slot.startTime
+                                    return (
+                                      <button
+                                        key={`${slot.shiftId}-${slot.startTime}`}
+                                        type="button"
+                                        onClick={() =>
+                                          set('selectedSlot', {
+                                            shiftId: slot.shiftId,
+                                            shiftName: slot.shiftName,
+                                            startTime: slot.startTime,
+                                            availableSeats: slot.availableSeats,
+                                          })
+                                        }
+                                        className={cn(
+                                          'px-3 py-2 rounded-xl border text-sm font-semibold transition-all hover:scale-[1.03]',
+                                          isSel
+                                            ? 'text-white border-transparent shadow-md'
+                                            : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500',
+                                        )}
+                                        style={isSel ? { backgroundColor: primary, borderColor: primary } : {}}
+                                      >
+                                        {slot.startTime}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()
+                    )}
+                  </div>
                 </div>
 
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Clock className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-white">{t.step_slots}</span>
-                  </div>
-
-                  {slotsLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
-                    </div>
-                  ) : !slots?.length ? (
-                    <div className="text-center py-10 space-y-3">
-                      <AlertCircle className="w-8 h-8 text-zinc-600 mx-auto" />
-                      <div>
-                        <p className="text-sm text-zinc-400 font-medium">{t.noAvailability}</p>
-                        <p className="text-xs text-zinc-600 mt-1">{t.tryOther}</p>
-                      </div>
-                      <button onClick={() => setStep('config')} className="text-xs underline text-zinc-500 hover:text-zinc-300">
-                        {t.changeConfig}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {slots.map((slot) => (
-                        <button key={slot.shiftId}
-                          onClick={() => {
-                            set('selectedSlot', {
-                              shiftId: slot.shiftId,
-                              shiftName: slot.shiftName,
-                              startTime: slot.startTime,
-                              availableSeats: slot.availableSeats,
-                            })
-                            setStep('identity')
-                          }}
-                          className="group relative py-4 px-3 rounded-xl border border-zinc-700 hover:border-transparent text-center transition-all hover:scale-[1.02] active:scale-[0.98]"
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = primary)}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}>
-                          <p className="text-lg font-bold text-white">{slot.startTime}</p>
-                          <p className="text-xs text-zinc-400 mt-0.5">{slot.shiftName}</p>
-                          {slot.availableSeats > 0 && (
-                            <p className="text-[10px] text-zinc-600 mt-1">{slot.availableSeats} {t.seats}</p>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {/* Botão avançar */}
+                <div className="p-4 border-t border-zinc-800">
+                  <button
+                    onClick={() => setStep('identity')}
+                    disabled={form.partySize <= 0 || !form.selectedSlot}
+                    className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: primary, borderRadius: radius }}
+                  >
+                    {t.next}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -676,7 +795,7 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
             <motion.div key="identity" {...anim}>
               <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
                 <div className="flex items-center gap-3 p-4 border-b border-zinc-800">
-                  <button onClick={() => setStep('slots')} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
+                  <button onClick={() => setStep('schedule')} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <div className="flex-1 text-center">

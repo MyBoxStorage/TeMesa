@@ -28,10 +28,22 @@ export const widgetRouter = router({
   getRestaurantInfo: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.restaurant.findUnique({
+      const restaurant = await ctx.prisma.restaurant.findUnique({
         where: { slug: input.slug },
-        select: { name: true, logoUrl: true, coverUrl: true, themeConfig: true, operatingHours: true, slug: true },
+        select: {
+          name: true, logoUrl: true, coverUrl: true,
+          themeConfig: true, operatingHours: true, slug: true,
+          settings: true,
+          shifts: { where: { isActive: true }, select: { daysOfWeek: true, name: true } },
+        },
       })
+      if (!restaurant) return null
+      // Derive active days of week from shifts (0=Sun … 6=Sat)
+      const activeDaysOfWeek = [...new Set(restaurant.shifts.flatMap((s) => s.daysOfWeek))] as number[]
+      // Blocked dates stored in restaurant.settings.blockedDates
+      const settings = (restaurant.settings ?? {}) as Record<string, unknown>
+      const blockedDates = (settings.blockedDates ?? []) as string[]
+      return { ...restaurant, activeDaysOfWeek, blockedDates }
     }),
 
   getAvailableSlots: publicProcedure

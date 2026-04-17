@@ -58,17 +58,19 @@ export async function createPixOrder(params: CreatePixOrderParams): Promise<PixO
     throw new Error(`Pagar.me ${res.status}: ${err}`)
   }
 
-  const data = await res.json() as any
+  const data = (await res.json()) as {
+    id?: string
+    charges?: Array<{ last_transaction?: { qr_code?: string; qr_code_url?: string; expires_at?: string } }>
+  }
   const lastTx = data.charges?.[0]?.last_transaction
 
   if (!lastTx?.qr_code) throw new Error('Pagar.me não retornou QR code Pix')
+  if (!data.id) throw new Error('Pagar.me não retornou id do pedido')
 
   return {
     orderId: String(data.id),
     pixCode: String(lastTx.qr_code),
-    pixQrCodeUrl: lastTx.qr_code_url
-      ? `data:image/png;base64,${lastTx.qr_code_url}`
-      : '',
+    pixQrCodeUrl: lastTx.qr_code_url ? String(lastTx.qr_code_url) : '',
     expiresAt: lastTx.expires_at ? new Date(lastTx.expires_at) : params.expiresAt,
   }
 }

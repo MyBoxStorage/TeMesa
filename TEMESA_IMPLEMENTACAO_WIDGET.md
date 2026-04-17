@@ -664,3 +664,46 @@ O arquivo correto está em `src/app/globals.css`.
 
 *Documento atualizado em abril 2026.*
 *Sistema em desenvolvimento local. Deploy em `https://temesa.vercel.app`.*
+
+---
+
+## 17. Regras para embed de iframe com autenticação
+
+### 17.1 iframe + auth provider — CSP frame-src obrigatório
+
+Ao embutir o widget TeMesa (ou qualquer app com autenticação) via `<iframe>` em um site externo,
+o site pai **precisa permitir os domínios do provider de auth** na sua Content-Security-Policy,
+especificamente na diretiva `frame-src`.
+
+Provedores que **injetam iframes invisíveis** para gerenciar sessão:
+
+| Auth provider | Domínios a adicionar no `frame-src` |
+|---|---|
+| **Clerk** (usado no TeMesa) | `https://*.clerk.accounts.dev https://*.clerk.com` |
+| Auth0 | `https://*.auth0.com` |
+| Firebase Auth | `https://*.firebaseapp.com` |
+| Supabase Auth | não injeta iframes — nenhuma adição necessária |
+| NextAuth.js | não injeta iframes — nenhuma adição necessária |
+
+**Por que isso importa:**
+O Clerk injeta um iframe invisível para sincronizar o estado de sessão entre abas e domínios.
+Se o site pai tiver `frame-src` restritivo e os domínios do Clerk não estiverem na lista,
+o browser bloqueia silenciosamente esse iframe. O sintoma é falha de sessão ou loop de redirect
+dentro do widget, mesmo que o iframe principal carregue normalmente.
+
+**Exemplo de CSP correta para um site que embute o TeMesa (Clerk):**
+```
+Content-Security-Policy: frame-src 'self' https://temesa.vercel.app https://*.clerk.accounts.dev https://*.clerk.com;
+```
+
+**Exemplo no `next.config.js` do site pai (ex: portocabralatual):**
+```js
+{
+  key: 'Content-Security-Policy',
+  value: "frame-src 'self' https://temesa.vercel.app https://*.clerk.accounts.dev https://*.clerk.com;"
+}
+```
+
+> **Regra prática:** antes de embutir qualquer iframe de app externo, identifique o provider
+> de auth dele e adicione os domínios correspondentes ao `frame-src` do site pai.
+> Erro clássico: widget carrega mas reserva não finaliza / usuário fica deslogado.

@@ -3,8 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { sendNotification } from '@/lib/notifications'
 
 function authorized(req: Request): boolean {
-  const expected = process.env.ZAPI_TOKEN ?? ''
-  if (!expected) return true
+  const expected = process.env.ZAPI_CLIENT_TOKEN ?? ''
+  if (!expected) {
+    console.warn('[Z-API Webhook] ZAPI_CLIENT_TOKEN não configurado — webhook sem autenticação')
+    return true
+  }
   const token = req.headers.get('x-z-api-security-token') ?? ''
   return token === expected
 }
