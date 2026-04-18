@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { X, Tag, Phone, Mail, Calendar, Star, Trash2, Save, AlertTriangle, Repeat, Plus } from 'lucide-react'
+import { X, Tag, Phone, Mail, Calendar, Trash2, Save, AlertTriangle, Repeat, Plus, ChevronDown } from 'lucide-react'
+import type { Reservation } from '@prisma/client'
+import { ReservationQuizAnswers } from '@/components/reservas/reservation-quiz-answers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -95,6 +97,7 @@ export function CustomerDetail({ customerId, restaurantId, onClose }: Props) {
   const [editTags, setEditTags] = useState<string[] | null>(null)
   const [editNotes, setEditNotes] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [expandedReservationId, setExpandedReservationId] = useState<string | null>(null)
 
   const update = api.customers.update.useMutation({
     onSuccess: () => { utils.customers.getById.invalidate(); utils.customers.list.invalidate(); toast.success('Cliente atualizado!') },
@@ -361,20 +364,67 @@ export function CustomerDetail({ customerId, restaurantId, onClose }: Props) {
               </Button>
             )}
 
-            {/* Histórico de reservas */}
+            {/* Histórico de reservas + questionário por reserva */}
             {customer.reservations && customer.reservations.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[12px] font-medium">Histórico de reservas</p>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {customer.reservations.map((r: any) => (
-                    <div key={r.id} className="flex items-center justify-between p-2.5 bg-muted/20 rounded-lg">
-                      <div>
-                        <p className="text-[12px] font-medium">{format(new Date(r.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
-                        <p className="text-[11px] text-muted-foreground">{r.partySize} pessoa{r.partySize > 1 ? 's' : ''}</p>
+              <div className="space-y-2 border-t border-border pt-4">
+                <div>
+                  <p className="text-[12px] font-medium">Histórico de reservas</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Selecione uma reserva para ver o questionário preenchido na ocasião.
+                  </p>
+                </div>
+                <div className="space-y-2 max-h-[min(28rem,55vh)] overflow-y-auto pr-0.5">
+                  {(customer.reservations as Reservation[]).map((r) => {
+                    const open = expandedReservationId === r.id
+                    return (
+                      <div key={r.id} className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedReservationId(open ? null : r.id)}
+                          className={cn(
+                            'w-full flex items-center justify-between gap-2 p-2.5 rounded-lg border text-left transition-colors',
+                            open
+                              ? 'border-primary/25 bg-primary/5'
+                              : 'border-border/50 bg-muted/20 hover:bg-muted/35',
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12px] font-medium">
+                              {format(new Date(r.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {r.partySize} pessoa{r.partySize > 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={cn(
+                                'text-[10px] px-2 py-0.5 rounded-lg font-semibold',
+                                STATUS_COLORS[r.status] ?? 'bg-muted text-muted-foreground',
+                              )}
+                            >
+                              {STATUS_LABELS[r.status] ?? r.status}
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                'w-4 h-4 text-muted-foreground transition-transform shrink-0',
+                                open && 'rotate-180',
+                              )}
+                              aria-hidden
+                            />
+                          </div>
+                        </button>
+                        {open && (
+                          <div className="rounded-lg border border-border/60 bg-muted/15 px-2 py-2.5 ml-0.5">
+                            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide font-semibold mb-2 px-1">
+                              Questionário desta reserva
+                            </p>
+                            <ReservationQuizAnswers reservation={r} whenEmpty="message" />
+                          </div>
+                        )}
                       </div>
-                      <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium', STATUS_COLORS[r.status] ?? 'bg-muted text-muted-foreground')}>{STATUS_LABELS[r.status] ?? r.status}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
