@@ -17,7 +17,7 @@
 7. [Configurando notificações WhatsApp](#7-configurando-notificações-whatsapp)
 8. [Obtendo a URL e o código de embed](#8-obtendo-a-url-e-o-código-de-embed)
 9. [Adicionando ao site do restaurante](#9-adicionando-ao-site-do-restaurante)
-10. [Deploy em produção — Netlify](#10-deploy-em-produção--netlify)
+10. [Deploy em produção — Vercel](#10-deploy-em-produção--vercel)
 11. [Variáveis de ambiente — referência completa](#11-variáveis-de-ambiente--referência-completa)
 12. [Banco de dados — setup inicial](#12-banco-de-dados--setup-inicial)
 13. [Crons externos — cron-job.org](#13-crons-externos--cron-joborg)
@@ -50,7 +50,7 @@ Stack:
   Clerk v7 (autenticação multi-tenant)
   Z-API (WhatsApp Business)
   Resend (e-mail)
-  Netlify (deploy)
+  Vercel (deploy)
 ```
 
 ---
@@ -59,11 +59,11 @@ Stack:
 
 | Item | Onde obter | Obrigatório |
 |---|---|---|
-| Conta Netlify | netlify.com | ✅ |
+| Conta Vercel | vercel.com | ✅ |
 | Conta Supabase | supabase.com | ✅ |
 | Conta Clerk | clerk.com | ✅ |
 | Número WhatsApp Business + Z-API | z-api.io | ✅ |
-| Netlify CLI instalado | `npm install -g netlify-cli` | ✅ |
+| Vercel CLI instalado | `npm install -g vercel` | Opcional |
 | Conta Resend | resend.com | Recomendado |
 | Conta cron-job.org | cron-job.org | Recomendado |
 
@@ -243,18 +243,15 @@ Altura recomendada: `700px` desktop, `750px` mobile.
 
 ---
 
-## 10. Deploy em produção — Netlify
+## 10. Deploy em produção — Vercel
 
 ### 10.1 Arquivos obrigatórios na raiz do projeto
 
-**`netlify.toml`:**
-```toml
-[build]
-  command   = "pnpm prisma generate && pnpm run build"
-  publish   = ".next"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+**`vercel.json`** (já presente no projeto):
+```json
+{
+  "framework": "nextjs"
+}
 ```
 
 **`package.json`** — script `postinstall`:
@@ -278,13 +275,6 @@ datasource db {
 "exclude": ["node_modules", "prisma"]
 ```
 
-**`.npmrc`** — necessário para desenvolvimento local no Windows:
-```
-shamefully-hoist=true
-ignore-scripts[]=sharp
-ignore-scripts[]=unrs-resolver
-```
-
 **`next.config.js`** — configuração atual com headers de segurança e resolveAlias:
 ```js
 const path = require('path')
@@ -299,9 +289,6 @@ const nextConfig = {
   reactStrictMode: true,
   turbopack: {
     resolveAlias: {
-      // Hardpina tailwindcss ao node_modules local.
-      // Evita que enhanced-resolve suba a árvore e encontre
-      // package.json fantasma em diretórios ancestrais.
       'tailwindcss': path.resolve(__dirname, 'node_modules/tailwindcss'),
     },
   },
@@ -334,33 +321,24 @@ git remote add origin https://github.com/SEU_USER/TeMesa.git
 git branch -M main
 git push -u origin main
 
-# 2. No Netlify: New project → Import from GitHub → selecionar o repo
-#    O Netlify detecta Next.js automaticamente e configura o plugin
+# 2. No Vercel: New Project → Import from GitHub → selecionar o repo
+#    O Vercel detecta Next.js automaticamente
 
-# 3. Instalar Netlify CLI (usar npm, não pnpm global)
-npm install -g netlify-cli
+# 3. Configurar variáveis de ambiente no painel do Vercel
+#    Settings → Environment Variables → importar todas do .env
 
-# 4. Login e link com o projeto Netlify
-netlify login
-netlify link
-
-# 5. Importar TODAS as variáveis do .env para o Netlify de uma vez
-netlify env:import .env
-
-# 6. Forçar redeploy para embutir variáveis NEXT_PUBLIC_* no bundle
+# 4. Forçar redeploy para embutir variáveis NEXT_PUBLIC_* no bundle
 git commit --allow-empty -m "chore: trigger redeploy with env vars"
 git push
 ```
 
-> **Não usar** `netlify deploy --build --prod` no Windows — causa erro EPERM
-> com arquivos `.dll` do Prisma em uso. Sempre fazer deploy via `git push`.
-
 ### 10.3 Deploys subsequentes
 
-Todo `git push` para `main` dispara deploy automático.
+Todo `git push` para `main` dispara deploy automático no Vercel.
 
 Variáveis `NEXT_PUBLIC_*` são embutidas no bundle no momento do build.
-Ao alterar qualquer variável de ambiente, sempre fazer um novo deploy.
+Ao alterar qualquer variável de ambiente, sempre fazer um novo deploy (pode ser disparado
+diretamente no painel Vercel → Deployments → Redeploy).
 
 ---
 
@@ -381,7 +359,7 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding
 
 # ── BANCO DE DADOS (Supabase) ─────────────────────────────────────────────────
 DATABASE_URL=postgresql://postgres.XXXX:SENHA@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
-# Transaction pooler — porta 6543 — runtime (Netlify serverless)
+# Transaction pooler — porta 6543 — runtime (Vercel serverless)
 
 DIRECT_URL=postgresql://postgres:SENHA@db.XXXX.supabase.co:5432/postgres
 # Direct connection — porta 5432 — prisma db push / migrations
@@ -443,8 +421,8 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
 
 ## 13. Crons externos — cron-job.org
 
-O Netlify free não suporta crons com frequência maior que 1x/dia.
-Configure no **cron-job.org** (gratuito).
+O Vercel free (Hobby) suporta crons apenas 1x/dia via `vercel.json`.
+Para maior frequência, configure no **cron-job.org** (gratuito).
 
 **Job 1 — Expirar reservas com pagamento pendente:**
 ```
@@ -501,10 +479,10 @@ Requer `PAGARME_API_KEY` e `PAGARME_WEBHOOK_SECRET`.
 | `no_show_policy` | `COBRAR_TOTAL` / `COBRAR_PARCIAL` / `REEMBOLSAR` / `CREDITO` |
 | `cancellation_deadline_hours` | Horas antes para cancelar sem cobrança |
 
-### 15.2 Domínio personalizado no Netlify
+### 15.2 Domínio personalizado no Vercel
 
-1. Netlify → **Domain management → Add domain**
-2. DNS do domínio: `reservas CNAME temesa.vercel.app`
+1. Vercel → seu projeto → **Settings → Domains → Add**
+2. DNS do domínio: `reservas CNAME cname.vercel-dns.com`
 3. Atualizar `NEXT_PUBLIC_APP_URL` e fazer redeploy
 
 ---
@@ -513,7 +491,7 @@ Requer `PAGARME_API_KEY` e `PAGARME_WEBHOOK_SECRET`.
 
 ### `@clerk/nextjs: Missing publishableKey`
 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` não foi embutida no bundle.
-**Solução:** `netlify env:import .env` → novo deploy via `git push`.
+**Solução:** configurar a variável no painel Vercel → Settings → Environment Variables → novo deploy.
 
 ### Build: `Cannot find module '@radix-ui/react-label'`
 `field.tsx` importa pacote individual não instalado.
@@ -531,19 +509,19 @@ Form de onboarding não envia `address`.
 ### Build: `PrismaClient not exported`
 Prisma Client não gerado.
 **Solução:** `"postinstall": "prisma generate"` no `package.json` +
-excluir `"prisma"` do `tsconfig.json` + `pnpm prisma generate &&` no `netlify.toml`.
+excluir `"prisma"` do `tsconfig.json`.
 
 ### Deploy: `publish directory same as base directory`
-`netlify.toml` sem `publish = ".next"`.
-**Solução:** adicionar `publish = ".next"` ao `[build]`.
+Erro específico do Netlify — não se aplica ao Vercel.
+O Vercel detecta Next.js automaticamente sem necessidade de configurar diretório de publicação.
 
 ### `prisma db push` trava
 Pooler (porta 6543) não aceita DDL.
 **Solução:** usar SQL Editor do Supabase com `directUrl = env("DIRECT_URL")` (porta 5432).
 
 ### Build local: `EPERM: operation not permitted` no Windows
-`netlify deploy --build --prod` conflita com arquivos `.dll` do Prisma em uso.
-**Solução:** nunca buildar localmente via CLI. Sempre fazer deploy via `git push`.
+Ocorre ao tentar buildar localmente com arquivos `.dll` do Prisma em uso.
+**Solução:** sempre fazer deploy via `git push` — nunca buildar para produção localmente.
 
 ### Widget: "Sem disponibilidade" para todas as datas
 Sem turno ativo ou turno não inclui o dia selecionado.
@@ -657,13 +635,13 @@ O arquivo correto está em `src/app/globals.css`.
 - Configurar Z-API (WhatsApp): `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`
 - Configurar Resend (e-mail): `RESEND_API_KEY`
 - Tornar-se admin: `UPDATE "User" SET "isAdmin" = true WHERE email = 'SEU@EMAIL.COM'`
-- Deploy para Netlify: `git push` + configurar env vars no painel do Netlify
+- Deploy para Vercel: `git push` + configurar env vars no painel Vercel (Settings → Environment Variables)
 - Configurar crons no cron-job.org
 
 ---
 
 *Documento atualizado em abril 2026.*
-*Sistema em desenvolvimento local. Deploy em `https://temesa.vercel.app`.*
+*Deploy em produção: `https://temesa.vercel.app`.*
 
 ---
 
