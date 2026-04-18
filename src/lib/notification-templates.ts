@@ -6,45 +6,97 @@ export const DEFAULT_TEMPLATES: Record<
 > = {
   RESERVATION_CREATED: {
     WHATSAPP:
-      '✅ *Reserva confirmada!*\nOlá {{guestName}}, sua reserva no *{{restaurantName}}* está confirmada.\n\n📅 {{date}} às {{time}}\n👥 {{partySize}} pessoas\n\nConfirme sua presença até 1 hora antes: {{confirmUrl}}\nPrecisa cancelar? {{cancelUrl}}\n\nAté lá! 🍽️',
+      '🎉 *Reserva confirmada!*\n\n' +
+      'Olá *{{guestName}}*! Sua mesa no *{{restaurantName}}* está garantida. Te esperamos! ✨\n\n' +
+      '📅 *{{date}}*\n' +
+      '⏰ *{{time}}h*\n' +
+      '👥 *{{partySize}} pessoa(s)*\n\n' +
+      '━━━━━━━━━━━━━━━━\n' +
+      'Vai confirmar presença? Responda:\n' +
+      '✅ *SIM* — estarei lá\n' +
+      '❌ *NÃO* — preciso cancelar\n' +
+      '━━━━━━━━━━━━━━━━\n\n' +
+      '_Ou acesse: {{confirmUrl}}_',
     EMAIL:
-      'Reserva confirmada!\n\nOlá {{guestName}}, sua reserva no {{restaurantName}} está confirmada.\n\nData: {{date}} {{time}}\nPessoas: {{partySize}}\nConfirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
+      'Reserva confirmada!\n\n' +
+      'Olá {{guestName}}, sua reserva no {{restaurantName}} está confirmada.\n\n' +
+      'Data: {{date}}\nHorário: {{time}}h\nPessoas: {{partySize}}\n\n' +
+      'Confirmar presença: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
   },
+
   REMINDER_24H: {
     WHATSAPP:
-      '⏰ *Lembrete de reserva*\nOlá {{guestName}}! Sua reserva no *{{restaurantName}}* é amanhã.\n\n📅 {{date}} às {{time}} • {{partySize}} pessoas\n\n✅ Responda *1* para CONFIRMAR\n❌ Responda *2* para CANCELAR\n\nOu acesse: {{confirmUrl}}',
+      '⏰ *Lembrete — amanhã no {{restaurantName}}*\n\n' +
+      'Olá *{{guestName}}*! Sua reserva é amanhã às *{{time}}h* para *{{partySize}} pessoa(s)*.\n\n' +
+      'Ainda vem? Responda:\n' +
+      '✅ *SIM* — confirmo presença\n' +
+      '❌ *NÃO* — preciso cancelar',
     EMAIL:
-      'Lembrete de reserva (24h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é amanhã.\n\nData: {{date}} {{time}}\nPessoas: {{partySize}}\nConfirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
+      'Lembrete — sua reserva é amanhã!\n\n' +
+      'Olá {{guestName}}, sua reserva no {{restaurantName}} é amanhã.\n\n' +
+      'Data: {{date}}\nHorário: {{time}}h\nPessoas: {{partySize}}\n\n' +
+      'Confirmar: {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
   },
+
   REMINDER_2H: {
     WHATSAPP:
-      '🍽️ Olá {{guestName}}! Sua reserva no *{{restaurantName}}* é em 2 horas ({{time}}).\n\n✅ Responda *1* para confirmar\n❌ Responda *2* para cancelar\n\nAté logo! 😊',
+      '🍽️ *Nos vemos em breve, {{guestName}}!*\n\n' +
+      'Sua reserva no *{{restaurantName}}* começa em 2 horas — às *{{time}}h*.\n\n' +
+      'Ainda vem? Responda:\n' +
+      '✅ *SIM* — estou a caminho\n' +
+      '❌ *NÃO* — preciso cancelar',
     EMAIL:
-      'Lembrete de reserva (2h)\n\nOlá {{guestName}}!\nSua reserva no {{restaurantName}} é em 2 horas.\nHorário: {{time}}\n',
+      'Sua reserva começa em 2 horas!\n\n' +
+      'Olá {{guestName}}, sua reserva no {{restaurantName}} é em 2 horas.\n' +
+      'Horário: {{time}}h\n',
   },
+
   PAYMENT_CONFIRMED: {
     WHATSAPP:
-      '💳 *Pagamento confirmado!*\nOlá {{guestName}}, seu sinal para *{{restaurantName}}* foi recebido.\n📅 {{date}} às {{time}} • Obrigado! 🎉',
+      '💳 *Pagamento confirmado!*\n\n' +
+      'Olá *{{guestName}}*! Recebemos seu sinal para *{{restaurantName}}*.\n\n' +
+      '📅 *{{date}}* às *{{time}}h* · *{{partySize}} pessoa(s)*\n\n' +
+      '_Sua vaga está garantida. Até lá! 🥂_',
     EMAIL:
-      'Pagamento confirmado\n\nOlá {{guestName}}, seu sinal para {{restaurantName}} foi recebido.\nData: {{date}} {{time}}\n',
+      'Pagamento confirmado!\n\n' +
+      'Olá {{guestName}}, seu sinal para {{restaurantName}} foi recebido.\n' +
+      'Data: {{date}} {{time}}h\n',
   },
+
   WAITLIST_AVAILABLE: {
     WHATSAPP:
-      '🎉 *Mesa disponível no {{restaurantName}}!*\nOlá {{guestName}}, uma mesa ficou disponível!\n\nVocê tem *15 minutos* para confirmar: {{confirmUrl}}\nNão quer mais? {{cancelUrl}}',
+      '🎉 *Mesa disponível!*\n\n' +
+      'Olá *{{guestName}}*! Uma mesa ficou disponível no *{{restaurantName}}*.\n\n' +
+      '⚡ Você tem *15 minutos* para confirmar!\n\n' +
+      '✅ *SIM* — quero a mesa\n' +
+      '❌ *NÃO* — pode liberar\n\n' +
+      '_Ou acesse: {{confirmUrl}}_',
     EMAIL:
-      'Mesa disponível!\n\nOlá {{guestName}}, uma mesa ficou disponível no {{restaurantName}}.\nConfirmar (15 min): {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
+      'Mesa disponível!\n\n' +
+      'Olá {{guestName}}, uma mesa ficou disponível no {{restaurantName}}.\n' +
+      'Confirmar (15 min): {{confirmUrl}}\nCancelar: {{cancelUrl}}\n',
   },
+
   POST_VISIT: {
     WHATSAPP:
-      '🙏 Olá {{guestName}}, obrigado pela visita ao *{{restaurantName}}*!\n\nComo foi sua experiência?\n⭐ Deixe sua avaliação: {{reviewUrl}}\n\nSua opinião nos ajuda muito! 💛',
+      '🙏 *Obrigado pela visita, {{guestName}}!*\n\n' +
+      'Foi um prazer ter você no *{{restaurantName}}*.\n\n' +
+      'Sua opinião nos ajuda muito — deixe uma avaliação:\n' +
+      '⭐ {{reviewUrl}}\n\n' +
+      '_Esperamos te ver novamente em breve! 💛_',
     EMAIL:
-      'Obrigado pela visita!\n\nOlá {{guestName}}, obrigado pela visita ao {{restaurantName}}.\nAvaliar: {{reviewUrl}}\n',
+      'Obrigado pela visita!\n\n' +
+      'Olá {{guestName}}, obrigado por visitar o {{restaurantName}}.\n' +
+      'Avaliar: {{reviewUrl}}\n',
   },
+
   CANCELLED: {
     WHATSAPP:
-      '❌ Olá {{guestName}}, sua reserva no *{{restaurantName}}* de {{date}} às {{time}} foi cancelada. Até a próxima! 👋',
+      '❌ *Reserva cancelada*\n\n' +
+      'Olá *{{guestName}}*, sua reserva no *{{restaurantName}}* de *{{date}}* às *{{time}}h* foi cancelada.\n\n' +
+      '_Esperamos te receber em outra oportunidade! 👋_',
     EMAIL:
-      'Reserva cancelada\n\nOlá {{guestName}}, sua reserva no {{restaurantName}} de {{date}} às {{time}} foi cancelada.\n',
+      'Reserva cancelada\n\n' +
+      'Olá {{guestName}}, sua reserva no {{restaurantName}} de {{date}} às {{time}}h foi cancelada.\n',
   },
 }
-

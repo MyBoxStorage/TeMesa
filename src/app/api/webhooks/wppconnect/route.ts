@@ -24,7 +24,12 @@ export async function POST(req: NextRequest) {
 
     const phone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`
 
-    if (messageBody !== '1' && messageBody !== '2') {
+    const messageNorm = messageBody.toUpperCase().trim()
+
+    const isConfirm = ['1', 'S', 'SIM', 'YES', 'Y', 'OK', 'CONFIRMO', 'CONFIRMAR'].includes(messageNorm)
+    const isCancel  = ['2', 'N', 'NAO', 'NÃO', 'NO', 'CANCELAR', 'CANCELA'].includes(messageNorm)
+
+    if (!isConfirm && !isCancel) {
       return NextResponse.json({ ok: true, skipped: 'not-a-reply' })
     }
 
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: 'no-reservation' })
     }
 
-    if (messageBody === '1') {
+    if (isConfirm) {
       if (reservation.status === 'PENDING') {
         await prisma.reservation.update({
           where: { id: reservation.id },
@@ -59,9 +64,9 @@ export async function POST(req: NextRequest) {
       }
       await sendWhatsApp(
         phone,
-        `✅ Reserva confirmada! Esperamos você no ${reservation.restaurant.name}. Até lá! 🍽️`
+        `✅ *Presença confirmada!*\n\nPerfeito, *${reservation.guestName}*! Te esperamos no *${reservation.restaurant.name}*. Até lá! 🥂`
       )
-    } else if (messageBody === '2') {
+    } else if (isCancel) {
       await prisma.reservation.update({
         where: { id: reservation.id },
         data: { status: 'CANCELLED' },
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest) {
       })
       await sendWhatsApp(
         phone,
-        `❌ Reserva cancelada. Esperamos vê-lo em outra oportunidade no ${reservation.restaurant.name}! 👋`
+        `❌ *Reserva cancelada.*\n\nTudo certo, *${reservation.guestName}*. Esperamos te receber em outra oportunidade no *${reservation.restaurant.name}*! 👋`
       )
     }
 
