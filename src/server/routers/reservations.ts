@@ -5,6 +5,7 @@ import type { ReservationSource, ReservationStatus } from '@prisma/client'
 
 import { sendNotification } from '@/lib/notifications'
 import { sendBcEvent } from '@/lib/bcconnect'
+import { sendWhatsApp } from '@/lib/zapi'
 import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, reliabilityScore, generateConfirmToken } from '@/lib/reservationRules'
 import {
   type AuthedRestaurantCtx,
@@ -198,6 +199,25 @@ export const reservationsRouter = router({
       })
     }),
 
+  pendingConfirmation: staffProcedure
+    .input(z.object({ restaurantId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const now = new Date()
+      const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+      const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+
+      return ctx.prisma.reservation.findMany({
+        where: {
+          restaurantId: input.restaurantId,
+          status: 'CONFIRMED',
+          date: { gte: twoHoursFromNow, lte: fourHoursFromNow },
+          reminder2hSentAt: { not: null },
+        },
+        include: { customer: true, table: true },
+        orderBy: { date: 'asc' },
+      })
+    }),
+
   getById: staffProcedure
     .input(z.object({ restaurantId: z.string(), reservationId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -312,6 +332,48 @@ export const reservationsRouter = router({
 
       if (to === 'CANCELLED') {
         await sendNotification({ restaurantId: updated.restaurantId, trigger: 'CANCELLED', reservation: updated })
+
+        const dateStr = updated.date.toISOString().split('T')[0]
+        const start = new Date(`${dateStr}T00:00:00.000Z`)
+        const end = new Date(`${dateStr}T23:59:59.999Z`)
+
+        const nextInWaitlist = await ctx.prisma.waitlistEntry.findFirst({
+          where: {
+            restaurantId: updated.restaurantId,
+            date: { gte: start, lte: end },
+            status: 'WAITING',
+            partySize: { lte: updated.partySize + 1 },
+          },
+          orderBy: { position: 'asc' },
+        })
+
+        if (nextInWaitlist) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+          const notifiedAt = new Date()
+          const deadline = new Date(notifiedAt.getTime() + 30 * 60 * 1000)
+          const token = nextInWaitlist.confirmToken ?? generateConfirmToken()
+
+          await ctx.prisma.waitlistEntry.update({
+            where: { id: nextInWaitlist.id },
+            data: {
+              status: 'NOTIFIED',
+              notifiedAt,
+              responseDeadline: deadline,
+              confirmToken: token,
+            },
+          })
+
+          const confirmUrl = `${appUrl}/confirmar/${token}`
+          const cancelUrl = `${appUrl}/confirmar/${token}?action=cancel`
+          await sendWhatsApp(
+            nextInWaitlist.guestPhone,
+            `🎉 *Uma mesa está disponível!*\n\n` +
+              `Olá *${nextInWaitlist.guestName}*! Você estava na lista de espera e uma mesa ficou livre.\n\n` +
+              `⚡ Você tem *30 minutos* para confirmar!\n\n` +
+              `✅ *SIM* — quero a mesa: ${confirmUrl}\n` +
+              `❌ *NÃO* — pode liberar: ${cancelUrl}`,
+          )
+        }
       }
 
       if (to === 'CHECKED_IN' && updated.lgpdConsent && updated.customer?.lgpdConsent && updated.customer.email) {
@@ -360,11 +422,29 @@ export const reservationsRouter = router({
       })
       if (!reservation) throw new TRPCError({ code: 'NOT_FOUND' })
       if (reservation.confirmTokenExpiresAt && reservation.confirmTokenExpiresAt <= new Date()) {
+        if (reservation.status === 'CONFIRMED' || reservation.status === 'CHECKED_IN') {
+          return reservation
+        }
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Token expirado' })
+      }
+      if (reservation.status === 'CONFIRMED' || reservation.status === 'CHECKED_IN') {
+        return reservation
+      }
+      if (['FINISHED', 'CANCELLED', 'NO_SHOW'].includes(reservation.status)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Reserva não pode ser confirmada' })
       }
       const updated = await ctx.prisma.reservation.update({
         where: { id: reservation.id },
-        data: { status: 'CONFIRMED', confirmToken: null, confirmTokenExpiresAt: null },
+        data: {
+          status: 'CONFIRMED',
+          statusHistory: {
+            create: {
+              fromStatus: reservation.status,
+              toStatus: 'CONFIRMED',
+              changedBy: 'GUEST_LINK',
+            },
+          },
+        },
       })
       return updated
     }),

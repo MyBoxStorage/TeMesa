@@ -112,7 +112,16 @@ export function ConfigGeral({ restaurantId }: { restaurantId: string }) {
                   <Input {...field} placeholder="ChIJ..." className="h-10 max-w-sm" />
                 </FormControl>
                 <p className="text-[11px] text-muted-foreground">
-                  Encontre em Google Maps → seu restaurante → &quot;Compartilhar&quot; → Place ID
+                  Encontre em Google Maps → seu restaurante → &quot;Compartilhar&quot; → Place ID. Documentação:{' '}
+                  <a
+                    href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    Place ID (Google)
+                  </a>
+                  .
                 </p>
                 <FormMessage className="text-[11px]" />
               </FormItem>

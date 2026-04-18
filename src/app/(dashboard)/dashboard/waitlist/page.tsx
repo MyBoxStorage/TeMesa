@@ -131,7 +131,16 @@ export default function WaitlistPage() {
                 <Input type="number" min={1} max={20} className="h-9 text-[13px]" value={addForm.partySize} onChange={e => setAddForm(p => ({ ...p, partySize: parseInt(e.target.value) || 1 }))} />
               </div>
               <Button className="w-full h-9 text-[13px] mt-2" disabled={!addForm.name || !addForm.phone || addToWaitlist.isPending}
-                onClick={() => addToWaitlist.mutate({ restaurantId: restaurantId!, guestName: addForm.name, guestPhone: e164(addForm.phone), partySize: addForm.partySize, date: new Date() })}>
+                onClick={() =>
+                  addToWaitlist.mutate({
+                    restaurantId: restaurantId!,
+                    guestName: addForm.name,
+                    guestPhone: e164(addForm.phone),
+                    partySize: addForm.partySize,
+                    date: new Date(),
+                    lgpdConsent: true,
+                  })
+                }>
                 {addToWaitlist.isPending ? 'Adicionando...' : 'Adicionar à fila'}
               </Button>
             </div>

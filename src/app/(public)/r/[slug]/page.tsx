@@ -16,6 +16,9 @@ export default async function WidgetPage({ params }: { params: Promise<{ slug: s
       themeConfig: true,
       operatingHours: true,
       settings: true,
+      occupationStatus: true,
+      googlePlaceId: true,
+      prepaymentConfig: true,
       shifts: {
         where: { isActive: true },
         select: { daysOfWeek: true },
@@ -41,6 +44,15 @@ export default async function WidgetPage({ params }: { params: Promise<{ slug: s
   const settings = (restaurant.settings ?? {}) as Record<string, unknown>
   const blockedDates = (settings.blockedDates ?? []) as string[]
 
+  const pc = restaurant.prepaymentConfig as Record<string, unknown> | null
+  const upsellConfig = pc
+    ? {
+        occasions: (pc.upsell_occasions ?? []) as string[],
+        message: (pc.upsell_message ?? '') as string,
+        packageName: (pc.upsell_package_name ?? '') as string,
+      }
+    : null
+
   const restaurantProps = {
     id: restaurant.id,
     name: restaurant.name,
@@ -50,6 +62,9 @@ export default async function WidgetPage({ params }: { params: Promise<{ slug: s
     themeConfig: restaurant.themeConfig as Record<string, unknown> | null,
     activeDaysOfWeek,
     blockedDates,
+    occupationStatus: restaurant.occupationStatus,
+    googlePlaceId: restaurant.googlePlaceId,
+    upsellConfig,
   }
 
   return (

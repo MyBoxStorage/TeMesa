@@ -1,7 +1,10 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 import { rateLimitOrThrow } from '@/lib/rateLimit'
+import { sendWhatsApp } from '@/lib/zapi'
 import { createWidgetReservation, getWidgetAvailability } from '@/lib/widgetPublic'
 import { publicProcedure, router } from '@/server/trpc'
 
@@ -31,19 +34,37 @@ export const widgetRouter = router({
       const restaurant = await ctx.prisma.restaurant.findUnique({
         where: { slug: input.slug },
         select: {
+          id: true,
           name: true, logoUrl: true, coverUrl: true,
           themeConfig: true, operatingHours: true, slug: true,
           settings: true,
+          occupationStatus: true,
+          googlePlaceId: true,
+          prepaymentConfig: true,
           shifts: { where: { isActive: true }, select: { daysOfWeek: true, name: true } },
         },
       })
       if (!restaurant) return null
+      const { prepaymentConfig, ...restaurantPublic } = restaurant
       // Derive active days of week from shifts (0=Sun … 6=Sat)
       const activeDaysOfWeek = [...new Set(restaurant.shifts.flatMap((s) => s.daysOfWeek))] as number[]
       // Blocked dates stored in restaurant.settings.blockedDates
       const settings = (restaurant.settings ?? {}) as Record<string, unknown>
       const blockedDates = (settings.blockedDates ?? []) as string[]
-      return { ...restaurant, activeDaysOfWeek, blockedDates }
+      const cfg = prepaymentConfig as Record<string, unknown> | null
+      const upsellConfig = cfg
+        ? {
+            occasions: (cfg.upsell_occasions ?? []) as string[],
+            message: (cfg.upsell_message ?? '') as string,
+            packageName: (cfg.upsell_package_name ?? '') as string,
+          }
+        : null
+      return {
+        ...restaurantPublic,
+        activeDaysOfWeek,
+        blockedDates,
+        upsellConfig,
+      }
     }),
 
   getAvailableSlots: publicProcedure
@@ -131,7 +152,7 @@ export const widgetRouter = router({
     .mutation(async ({ ctx, input }) => {
       const reservation = await ctx.prisma.reservation.findFirst({
         where: { confirmToken: input.token },
-        include: { restaurant: { select: { googlePlaceId: true } } },
+        include: { restaurant: { select: { googlePlaceId: true, phone: true, name: true } } },
       })
       if (!reservation) throw new TRPCError({ code: 'NOT_FOUND', message: 'Reserva não encontrada' })
 
@@ -151,6 +172,19 @@ export const widgetRouter = router({
             } as any,
           },
         })
+      }
+
+      if (input.rating <= 3 && reservation.restaurant?.phone) {
+        const comment = input.comment ? `\n💬 "${input.comment}"` : ''
+        const when = format(new Date(reservation.date), "dd/MM 'às' HH:mm", { locale: ptBR })
+        await sendWhatsApp(
+          reservation.restaurant.phone,
+          `⚠️ *Avaliação negativa recebida*\n\n` +
+            `Cliente: ${reservation.guestName}\n` +
+            `Nota: ${'⭐'.repeat(input.rating)}\n` +
+            `Reserva: ${when}` +
+            comment,
+        )
       }
 
       const googleReviewUrl = reservation.restaurant?.googlePlaceId

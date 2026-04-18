@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { posthog } from '@/lib/posthog'
 import confetti from 'canvas-confetti'
+import { WaitlistForm } from '@/components/widget/waitlist-form'
 
 function maskPhone(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11)
@@ -162,6 +163,12 @@ const T = {
     enterName: 'Informe seu nome', enterPhone: 'Informe seu WhatsApp',
     acceptTerms: 'Aceite os termos para continuar',
     seats: 'lugares',
+    occ_hint_OPEN: '🟢 Ambiente tranquilo — boas chances de achar horário.',
+    occ_hint_BUSY: '🟡 Restaurante movimentado — poucos horários.',
+    occ_hint_FULL: '🔴 Lotado no momento — tente outro dia ou entre na fila.',
+    waitlist_headline: 'Sem horário neste dia?',
+    waitlist_sub: 'Entre na fila de espera. Avisamos pelo WhatsApp se abrir vaga.',
+    upsell_review: 'Avaliar no Google',
   },
   EN: {
     onlineReservations: 'Online reservations',
@@ -226,6 +233,12 @@ const T = {
     enterName: 'Please enter your name', enterPhone: 'Please enter your WhatsApp',
     acceptTerms: 'Accept the terms to continue',
     seats: 'seats',
+    occ_hint_OPEN: '🟢 Relaxed pace — plenty of times available.',
+    occ_hint_BUSY: '🟡 Busy — fewer slots left.',
+    occ_hint_FULL: '🔴 Fully booked — try another day or join the waitlist.',
+    waitlist_headline: 'No times this day?',
+    waitlist_sub: 'Join the waitlist. We will WhatsApp you if a table opens.',
+    upsell_review: 'Review on Google',
   },
   ES: {
     onlineReservations: 'Reservas online',
@@ -290,6 +303,12 @@ const T = {
     enterName: 'Ingresa tu nombre', enterPhone: 'Ingresa tu WhatsApp',
     acceptTerms: 'Acepta los términos para continuar',
     seats: 'lugares',
+    occ_hint_OPEN: '🟢 Ambiente tranquilo — buena disponibilidad.',
+    occ_hint_BUSY: '🟡 Mucho movimiento — pocos horarios.',
+    occ_hint_FULL: '🔴 Completo — prueba otro día o únete a la lista de espera.',
+    waitlist_headline: '¿Sin horario este día?',
+    waitlist_sub: 'Únete a la lista. Te avisamos por WhatsApp si hay mesa.',
+    upsell_review: 'Valorar en Google',
   },
 } as const
 
@@ -333,12 +352,21 @@ function SelectCard({
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
+interface UpsellConfig {
+  occasions: string[]
+  message: string
+  packageName: string
+}
+
 interface Restaurant {
   id: string; name: string; slug: string
   logoUrl?: string | null; coverUrl?: string | null
   themeConfig?: Record<string, unknown> | null
   activeDaysOfWeek?: number[]
   blockedDates?: string[]
+  occupationStatus?: string | null
+  upsellConfig?: UpsellConfig | null
+  googlePlaceId?: string | null
 }
 
 const ICON_SIZE = 22
@@ -363,6 +391,41 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
     { slug: restaurant.slug, date: form.date, partySize: form.partySize },
     { enabled: step === 'schedule' && !!form.date && form.partySize > 0 }
   )
+
+  const { data: liveInfo } = api.widget.getRestaurantInfo.useQuery(
+    { slug: restaurant.slug },
+    { staleTime: 30_000, enabled: step === 'schedule' || step === 'success' },
+  )
+
+  const occupation = (liveInfo?.occupationStatus ?? restaurant.occupationStatus ?? 'OPEN') as
+    | 'OPEN'
+    | 'BUSY'
+    | 'FULL'
+  const upsellConfig = liveInfo?.upsellConfig ?? restaurant.upsellConfig ?? null
+  const googlePlaceId = liveInfo?.googlePlaceId ?? restaurant.googlePlaceId ?? null
+
+  const occHint =
+    occupation === 'BUSY' ? t.occ_hint_BUSY : occupation === 'FULL' ? t.occ_hint_FULL : t.occ_hint_OPEN
+
+  const occasionLabel = (code: string) => {
+    const map: Record<string, string> = {
+      BIRTHDAY: t.occ_birthday,
+      ROMANTIC: t.occ_romantic,
+      CORPORATE: t.occ_corporate,
+      FAMILY: t.occ_family,
+      SHOW: t.occ_show,
+      HAPPY_HOUR: t.occ_happyhour,
+      JUST: t.occ_just,
+      OTHER: t.occ_other,
+    }
+    return map[code] ?? code
+  }
+
+  const showUpsell =
+    Boolean(upsellConfig?.occasions?.length) &&
+    Boolean(form.occasionType) &&
+    upsellConfig!.occasions.includes(form.occasionType) &&
+    (Boolean(upsellConfig?.packageName?.trim()) || Boolean(upsellConfig?.message?.trim()))
 
   const create = api.widget.createReservation.useMutation({
     onSuccess: (data) => {
@@ -583,6 +646,18 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                 </div>
 
                 <div className="overflow-y-auto max-h-[70vh] divide-y divide-zinc-800">
+                  <div
+                    className={cn(
+                      'px-4 py-3 text-[11px] leading-snug border-b border-zinc-800',
+                      occupation === 'FULL'
+                        ? 'bg-red-500/10 text-red-200/90'
+                        : occupation === 'BUSY'
+                          ? 'bg-amber-500/10 text-amber-100/90'
+                          : 'bg-emerald-500/10 text-emerald-100/90',
+                    )}
+                  >
+                    {occHint}
+                  </div>
 
                   {/* ── Seção A: Tamanho do grupo ── */}
                   <div className="p-4">
@@ -749,7 +824,22 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                         <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
                       </div>
                     ) : !slots?.length ? (
-                      <p className="text-xs text-zinc-500 text-center py-4">{t.no_slots_date}</p>
+                      <div className="space-y-4 py-2">
+                        <p className="text-xs text-zinc-500 text-center">{t.no_slots_date}</p>
+                        <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-3 space-y-2">
+                          <p className="text-[11px] font-semibold text-zinc-200 text-center">{t.waitlist_headline}</p>
+                          <p className="text-[10px] text-zinc-500 text-center leading-relaxed">{t.waitlist_sub}</p>
+                          <WaitlistForm
+                            slug={restaurant.slug}
+                            date={form.date}
+                            partySize={form.partySize}
+                            shiftId={undefined}
+                            onSuccess={() => {
+                              set('selectedSlot', null)
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       // Agrupar por shiftName
                       (() => {
@@ -1173,6 +1263,41 @@ export function BookingWidget({ restaurant }: { restaurant: Restaurant }) {
                   </div>
                   <p className="text-xs text-zinc-500 mt-3">{t.youWillReceiveWhatsApp}</p>
                 </div>
+
+                {showUpsell && upsellConfig && (
+                  <div
+                    className="mt-4 p-4 rounded-xl border text-left space-y-2"
+                    style={{ borderColor: `${primary}55`, backgroundColor: `${primary}14` }}
+                  >
+                    <p className="text-[11px] font-semibold text-white">
+                      {upsellConfig.packageName?.trim()
+                        ? `${occasionLabel(form.occasionType)} · ${upsellConfig.packageName.trim()}`
+                        : occasionLabel(form.occasionType)}
+                    </p>
+                    {upsellConfig.message?.trim() ? (
+                      <p className="text-[11px] text-zinc-300 leading-relaxed">{upsellConfig.message.trim()}</p>
+                    ) : null}
+                    <p className="text-[10px] text-zinc-500">
+                      {lang === 'PT'
+                        ? 'Pergunte pelo balcão ou no WhatsApp do restaurante ao chegar.'
+                        : lang === 'ES'
+                          ? 'Pregunta en la recepción o por WhatsApp al llegar.'
+                          : 'Ask at the host stand or via the restaurant WhatsApp when you arrive.'}
+                    </p>
+                    {googlePlaceId ? (
+                      <a
+                        href={`https://search.google.com/local/writereview?placeid=${encodeURIComponent(googlePlaceId)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex text-[11px] font-medium underline-offset-2 hover:underline"
+                        style={{ color: primary }}
+                      >
+                        {t.upsell_review}
+                      </a>
+                    ) : null}
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {

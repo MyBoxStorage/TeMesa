@@ -3,11 +3,14 @@
 import { useMemo } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Users, Clock, AlertTriangle, CalendarCheck, XCircle, CheckCircle } from 'lucide-react'
+import { Users, Clock, AlertTriangle, CalendarCheck, XCircle, CheckCircle, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/trpc/react'
 import { useDashboard } from './dashboard-ctx'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { OccupationToggle } from '@/components/dashboard/occupation-toggle'
+import { toast } from 'sonner'
 
 export default function DashboardHome() {
   const { restaurantId } = useDashboard()
@@ -20,6 +23,21 @@ export default function DashboardHome() {
     },
     { enabled: !!restaurantId, refetchInterval: 30_000 }
   )
+
+  const { data: pendingConfirm } = api.reservations.pendingConfirmation.useQuery(
+    { restaurantId: restaurantId! },
+    { enabled: !!restaurantId, refetchInterval: 5 * 60 * 1000 },
+  )
+
+  const utils = api.useUtils()
+  const updateStatus = api.reservations.updateStatus.useMutation({
+    onSuccess: () => {
+      void utils.reservations.pendingConfirmation.invalidate()
+      void utils.reservations.list.invalidate()
+      toast.success('Status atualizado')
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   const stats = useMemo(() => {
     const all = reservations ?? []
@@ -54,6 +72,64 @@ export default function DashboardHome() {
         <h1 className="text-2xl font-bold">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</h1>
         <p className="text-sm text-muted-foreground mt-1">Visão geral do dia · {stats.total} reservas</p>
       </div>
+
+      <OccupationToggle />
+
+      {(pendingConfirm?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            Reservas sem confirmação (lembrete 2h enviado)
+          </h3>
+          <p className="text-[11px] text-muted-foreground">
+            Confirmadas nas próximas horas com lembrete de 2h já enviado — confirme presença por WhatsApp ou marque no-show se não comparecer.
+          </p>
+          <ul className="space-y-2">
+            {pendingConfirm!.map((r) => (
+              <li
+                key={r.id}
+                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium truncate">{r.guestName}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {format(new Date(r.date), "dd/MM HH:mm", { locale: ptBR })} · {r.partySize} pessoas
+                    {r.table?.name ? ` · ${r.table.name}` : ''}
+                  </p>
+                  <a
+                    href={`tel:${r.guestPhone}`}
+                    className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                  >
+                    <Phone className="w-3 h-3 shrink-0" />
+                    {r.guestPhone}
+                  </a>
+                </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <Button size="sm" variant="outline" className="h-8 text-[11px]" asChild>
+                    <a href={`tel:${r.guestPhone}`}>Ligar para confirmar</a>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 text-[11px]"
+                    disabled={updateStatus.isPending}
+                    onClick={() => {
+                      if (!confirm(`Marcar no-show para ${r.guestName}?`)) return
+                      updateStatus.mutate({
+                        restaurantId: restaurantId!,
+                        reservationId: r.id,
+                        status: 'NO_SHOW',
+                      })
+                    }}
+                  >
+                    Marcar no-show
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[

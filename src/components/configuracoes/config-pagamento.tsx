@@ -4,15 +4,28 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import Link from 'next/link'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
-import { AlertTriangle, Zap, ZapOff, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { AlertTriangle, Zap, ZapOff, ChevronDown, ChevronUp, Info, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const OCCASION_OPTIONS = [
+  { value: 'BIRTHDAY', label: 'Aniversário' },
+  { value: 'ROMANTIC', label: 'Romântico' },
+  { value: 'CORPORATE', label: 'Corporativo' },
+  { value: 'FAMILY', label: 'Família' },
+  { value: 'SHOW', label: 'Show / Evento' },
+  { value: 'HAPPY_HOUR', label: 'Happy Hour' },
+  { value: 'JUST', label: 'Casual' },
+  { value: 'OTHER', label: 'Outro' },
+] as const
 
 const schema = z.object({
   prepayment_type: z.enum(['POR_PESSOA', 'VALOR_FIXO', 'PERCENTUAL']),
@@ -21,6 +34,9 @@ const schema = z.object({
   no_show_policy: z.enum(['COBRAR_TOTAL', 'COBRAR_PARCIAL', 'REEMBOLSAR', 'CREDITO']),
   cancellation_deadline_hours: z.number().int().min(0),
   prepayment_expiry_minutes: z.number().int().min(5),
+  upsell_occasions: z.array(z.string()).optional(),
+  upsell_message: z.string().optional(),
+  upsell_package_name: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -47,6 +63,7 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
   const cfg = data?.config as Record<string, unknown> | null
   const enabled = cfg?.prepayment_enabled === true
   const planOk  = data?.plan !== 'GRATUITO'
+  const addonActive = data?.noShowProtectionAddon === true
 
   // Mutation separada só para ligar/desligar — salva instantaneamente
   const toggle = api.restaurant.updatePrepaymentConfig.useMutation({
@@ -69,6 +86,14 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
     onError: (e) => toast.error(e.message),
   })
 
+  const toggleAddon = api.restaurant.toggleNoShowProtection.useMutation({
+    onSuccess: () => {
+      void refetch()
+      toast.success('Add-on atualizado')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -78,6 +103,9 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
       no_show_policy: 'REEMBOLSAR',
       cancellation_deadline_hours: 24,
       prepayment_expiry_minutes: 30,
+      upsell_occasions: [],
+      upsell_message: '',
+      upsell_package_name: '',
     },
   })
 
@@ -90,13 +118,19 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
         no_show_policy: (cfg.no_show_policy as FormValues['no_show_policy']) ?? 'REEMBOLSAR',
         cancellation_deadline_hours: Number(cfg.cancellation_deadline_hours ?? 24),
         prepayment_expiry_minutes: Number(cfg.prepayment_expiry_minutes ?? 30),
+        upsell_occasions: (cfg.upsell_occasions as string[] | undefined) ?? [],
+        upsell_message: (cfg.upsell_message as string | undefined) ?? '',
+        upsell_package_name: (cfg.upsell_package_name as string | undefined) ?? '',
       })
     }
   }, [cfg, form])
 
   const handleToggle = (next: boolean) => {
     if (!planOk) return
-    // Ao ativar, mantém config existente; ao desativar, apenas muda o flag
+    if (next && !addonActive) {
+      toast.error('Ative o add-on Proteção No-Show antes de cobrar sinal Pix.')
+      return
+    }
     toggle.mutate({
       restaurantId,
       prepayment_enabled: next,
@@ -105,7 +139,27 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
   }
 
   const handleSaveConfig = (v: FormValues) => {
-    save.mutate({ restaurantId, prepayment_enabled: true, ...v })
+    save.mutate({
+      restaurantId,
+      prepayment_enabled: true,
+      ...v,
+      upsell_occasions: v.upsell_occasions ?? [],
+      upsell_message: v.upsell_message ?? '',
+      upsell_package_name: v.upsell_package_name ?? '',
+    })
+  }
+
+  const toggleOccasion = (code: string) => {
+    const cur = form.getValues('upsell_occasions') ?? []
+    if (cur.includes(code)) {
+      form.setValue(
+        'upsell_occasions',
+        cur.filter((c) => c !== code),
+        { shouldDirty: true },
+      )
+    } else {
+      form.setValue('upsell_occasions', [...cur, code], { shouldDirty: true })
+    }
   }
 
   if (isLoading) return <div className="h-48 animate-pulse bg-muted/30 rounded-xl" />
@@ -128,6 +182,33 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
           <p className="text-[12px] text-amber-300">
             Disponível a partir do plano <strong>Essencial</strong>. Faça upgrade para habilitar.
           </p>
+        </div>
+      )}
+
+      {planOk && (
+        <div className="rounded-xl border border-border bg-muted/15 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold">Proteção No-Show (add-on)</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                Obrigatório para habilitar o sinal Pix. Configure cobrança e políticas na página dedicada.
+              </p>
+              <Link
+                href="/dashboard/configuracoes/protecao-noshow"
+                className="text-[11px] text-primary underline-offset-2 hover:underline mt-1 inline-block"
+              >
+                Abrir Proteção No-Show
+              </Link>
+            </div>
+          </div>
+          <Switch
+            checked={addonActive}
+            onCheckedChange={(v) => toggleAddon.mutate({ restaurantId, enabled: v })}
+            disabled={toggleAddon.isPending}
+          />
         </div>
       )}
 
@@ -255,6 +336,43 @@ export function ConfigPagamento({ restaurantId }: { restaurantId: string }) {
                   <Label className="text-[12px]">Pix expira em (minutos)</Label>
                   <Input type="number" min={5} step={5} className="h-9 text-[12px]"
                     {...form.register('prepayment_expiry_minutes', { valueAsNumber: true })} />
+                </div>
+              </div>
+
+              <div className="space-y-2 border-t border-border pt-4">
+                <p className="text-[12px] font-semibold">Upsell no widget (após reserva)</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Para visitas com o motivo selecionado, mostramos um cartão com pacote e texto (ex.: bolo, flores).
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {OCCASION_OPTIONS.map((o) => {
+                    const sel = (form.watch('upsell_occasions') ?? []).includes(o.value)
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => toggleOccasion(o.value)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg border text-[11px] transition-colors',
+                          sel ? 'border-primary/50 bg-primary/15 text-foreground' : 'border-border text-muted-foreground',
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px]">Nome do pacote / produto</Label>
+                  <Input className="h-9 text-[12px]" placeholder="Ex.: Bolo surpresa" {...form.register('upsell_package_name')} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px]">Mensagem</Label>
+                  <Textarea
+                    className="text-[12px] min-h-[72px]"
+                    placeholder="Texto exibido no widget após confirmar a reserva."
+                    {...form.register('upsell_message')}
+                  />
                 </div>
               </div>
 

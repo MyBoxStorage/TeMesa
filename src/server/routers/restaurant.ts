@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { encrypt } from '@/lib/crypto'
 import { DEFAULT_TEMPLATES } from '@/lib/notifications'
-import { protectedProcedure, ownerProcedure, router, staffProcedure } from '@/server/trpc'
+import { managerProcedure, ownerProcedure, protectedProcedure, publicProcedure, router, staffProcedure } from '@/server/trpc'
 
 const addressSchema = z.record(z.string(), z.unknown())
 
@@ -137,6 +137,36 @@ export const restaurantRouter = router({
           noShowProtectionAddon: true,
           prepaymentConfig: true,
           googlePlaceId: true,
+          occupationStatus: true,
+          occupationUpdatedAt: true,
+        },
+      })
+    }),
+
+  getOccupationStatus: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const restaurant = await ctx.prisma.restaurant.findUnique({
+        where: { slug: input.slug },
+        select: { occupationStatus: true, occupationUpdatedAt: true, name: true },
+      })
+      if (!restaurant) return null
+      return restaurant
+    }),
+
+  updateOccupationStatus: managerProcedure
+    .input(
+      z.object({
+        restaurantId: z.string(),
+        status: z.enum(['OPEN', 'BUSY', 'FULL']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.restaurant.update({
+        where: { id: input.restaurantId },
+        data: {
+          occupationStatus: input.status,
+          occupationUpdatedAt: new Date(),
         },
       })
     }),
@@ -270,21 +300,42 @@ export const restaurantRouter = router({
     .input(
       z.object({
         restaurantId: z.string(),
-        prepayment_enabled: z.boolean(),
+        prepayment_enabled: z.boolean().optional(),
         prepayment_type: z.enum(['POR_PESSOA', 'VALOR_FIXO', 'PERCENTUAL']).optional(),
         prepayment_amount: z.number().min(0).optional(),
         prepayment_applies_to: z.enum(['TODAS_RESERVAS', 'FERIADOS', 'FINAIS_DE_SEMANA', 'MANUAL']).optional(),
         no_show_policy: z.enum(['COBRAR_TOTAL', 'COBRAR_PARCIAL', 'REEMBOLSAR', 'CREDITO']).optional(),
         cancellation_deadline_hours: z.number().int().min(0).optional(),
         prepayment_expiry_minutes: z.number().int().min(5).optional(),
+        upsell_occasions: z.array(z.string()).optional(),
+        upsell_message: z.string().optional(),
+        upsell_package_name: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { restaurantId, ...config } = input
-      const data = config.prepayment_enabled ? config : { prepayment_enabled: false }
+      const { restaurantId, ...patch } = input
+      const row = await ctx.prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { prepaymentConfig: true, noShowProtectionAddon: true },
+      })
+      const prev = (row?.prepaymentConfig ?? {}) as Record<string, unknown>
+      const merged: Record<string, unknown> = { ...prev }
+      for (const [k, v] of Object.entries(patch)) {
+        if (v !== undefined) merged[k] = v
+      }
+      const enabled = merged.prepayment_enabled === true
+      if (enabled && !row?.noShowProtectionAddon) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Ative o add-on de Proteção No-Show antes de habilitar o pagamento antecipado.',
+        })
+      }
+      if (merged.prepayment_enabled === false) {
+        merged.prepayment_enabled = false
+      }
       return ctx.prisma.restaurant.update({
         where: { id: restaurantId },
-        data: { prepaymentConfig: data as any },
+        data: { prepaymentConfig: merged as any },
       })
     }),
 
@@ -293,9 +344,13 @@ export const restaurantRouter = router({
     .query(async ({ ctx, input }) => {
       const r = await ctx.prisma.restaurant.findUnique({
         where: { id: input.restaurantId },
-        select: { prepaymentConfig: true, plan: true },
+        select: { prepaymentConfig: true, plan: true, noShowProtectionAddon: true },
       })
-      return { config: r?.prepaymentConfig ?? null, plan: r?.plan ?? 'GRATUITO' }
+      return {
+        config: r?.prepaymentConfig ?? null,
+        plan: r?.plan ?? 'GRATUITO',
+        noShowProtectionAddon: r?.noShowProtectionAddon ?? false,
+      }
     }),
 
   getPublicInfo: staffProcedure

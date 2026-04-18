@@ -119,6 +119,8 @@ model Restaurant {
   prepaymentConfig   Json?
   noShowProtectionAddon Boolean @default(false)
   googlePlaceId      String?
+  occupationStatus   String    @default("OPEN")
+  occupationUpdatedAt DateTime?
   onboardingStatus   Json      @default("{\"restaurant\":false,\"shifts\":false,\"tables\":false,\"notifications\":false}")
   bcConnectPartnerId String?
   bcConnectApiKey    String?

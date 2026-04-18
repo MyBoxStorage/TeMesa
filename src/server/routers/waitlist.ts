@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 
 import { sendWhatsApp } from '@/lib/zapi'
-import { generateConfirmToken } from '@/lib/reservationRules'
+import { confirmTokenExpiresAt, generateConfirmToken } from '@/lib/reservationRules'
 import { publicProcedure, hostessProcedure, managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)
@@ -22,25 +22,50 @@ export const waitlistRouter = router({
   add: publicProcedure
     .input(
       z.object({
-        restaurantId: z.string(),
+        restaurantId: z.string().optional(),
+        slug: z.string().optional(),
         guestName: z.string().min(2),
         guestPhone: e164,
         guestEmail: z.string().email().optional(),
         partySize: z.number().int().positive(),
         date: z.coerce.date(),
         shiftId: z.string().optional(),
+        lgpdConsent: z.boolean(),
+      })
+      .superRefine((val, ctx) => {
+        const hasId = Boolean(val.restaurantId?.trim())
+        const hasSlug = Boolean(val.slug?.trim())
+        if (hasId === hasSlug) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Informe restaurantId ou slug (apenas um).',
+          })
+        }
       })
     )
     .mutation(async ({ ctx, input }) => {
+      let restaurantId = input.restaurantId?.trim() ?? ''
+      if (!restaurantId && input.slug) {
+        const r = await ctx.prisma.restaurant.findUnique({
+          where: { slug: input.slug.trim() },
+          select: { id: true },
+        })
+        if (!r) throw new TRPCError({ code: 'NOT_FOUND', message: 'Restaurante não encontrado' })
+        restaurantId = r.id
+      }
+      if (!input.lgpdConsent) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'É necessário aceitar os termos (LGPD).' })
+      }
+
       const max = await ctx.prisma.waitlistEntry.aggregate({
-        where: { restaurantId: input.restaurantId },
+        where: { restaurantId },
         _max: { position: true },
       })
       const position = (max._max.position ?? 0) + 1
       const token = generateConfirmToken()
       return ctx.prisma.waitlistEntry.create({
         data: {
-          restaurantId: input.restaurantId,
+          restaurantId,
           shiftId: input.shiftId,
           guestName: input.guestName,
           guestPhone: input.guestPhone,
@@ -87,11 +112,17 @@ export const waitlistRouter = router({
     .mutation(async ({ ctx, input }) => {
       const entry = await ctx.prisma.waitlistEntry.findFirst({ where: { confirmToken: input.token } })
       if (!entry) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (entry.status !== 'NOTIFIED') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Não há convite ativo para confirmar. Aguarde ser avisado pelo WhatsApp.',
+        })
+      }
       if (entry.responseDeadline && entry.responseDeadline <= new Date()) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Prazo expirado' })
       }
 
-      // cria reserva automática (mínimo para MVP)
+      const resToken = generateConfirmToken()
       const reservation = await ctx.prisma.reservation.create({
         data: {
           restaurantId: entry.restaurantId,
@@ -103,8 +134,8 @@ export const waitlistRouter = router({
           shiftId: entry.shiftId,
           status: 'CONFIRMED',
           source: 'WIDGET',
-          confirmToken: null,
-          confirmTokenExpiresAt: null,
+          confirmToken: resToken,
+          confirmTokenExpiresAt: confirmTokenExpiresAt(entry.date),
           lgpdConsent: false,
           statusHistory: { create: { fromStatus: null, toStatus: 'CONFIRMED', changedBy: 'SYSTEM' } },
         },
@@ -123,6 +154,12 @@ export const waitlistRouter = router({
     .mutation(async ({ ctx, input }) => {
       const entry = await ctx.prisma.waitlistEntry.findFirst({ where: { confirmToken: input.token } })
       if (!entry) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (entry.status !== 'NOTIFIED') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Este convite não está mais ativo.',
+        })
+      }
       const updated = await ctx.prisma.waitlistEntry.update({
         where: { id: entry.id },
         data: { status: 'DECLINED' },
