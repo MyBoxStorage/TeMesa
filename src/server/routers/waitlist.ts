@@ -37,7 +37,7 @@ export const waitlistRouter = router({
         _max: { position: true },
       })
       const position = (max._max.position ?? 0) + 1
-      const token = nanoid(32)
+      const token = generateConfirmToken()
       return ctx.prisma.waitlistEntry.create({
         data: {
           restaurantId: input.restaurantId,
@@ -64,7 +64,7 @@ export const waitlistRouter = router({
 
       const now = new Date()
       const deadline = new Date(now.getTime() + 15 * 60 * 1000)
-      const token = entry.confirmToken ?? nanoid(32)
+      const token = entry.confirmToken ?? generateConfirmToken()
 
       const updated = await ctx.prisma.waitlistEntry.update({
         where: { id: entry.id },

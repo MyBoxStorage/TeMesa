@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { nanoid } from 'nanoid'
 import { addDays, getDay, startOfDay } from 'date-fns'
 
 import { prisma } from '@/lib/prisma'
-import { confirmTokenExpiresAt } from '@/lib/reservationRules'
+import { confirmTokenExpiresAt, generateConfirmToken } from '@/lib/reservationRules'
 
 function isCronAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET ?? ''
@@ -45,7 +44,7 @@ export async function GET(req: Request) {
       })
       if (existing) continue
 
-      const token = nanoid(32)
+      const token = generateConfirmToken()
       const expiresAt = confirmTokenExpiresAt(targetDate)
 
       await prisma.reservation.create({
