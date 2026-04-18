@@ -11,7 +11,6 @@
 import { PrismaClient } from '@prisma/client'
 import { config } from 'dotenv'
 import path from 'path'
-import { randomBytes } from 'crypto'
 
 config({ path: path.resolve(process.cwd(), '.env') })
 
@@ -36,7 +35,9 @@ async function main() {
   console.log(`✅ Restaurante: ${restaurant.name}`)
   console.log(`   Cover URL: ${restaurant.coverUrl ?? '(vazio)'}`)
 
-  const token = randomBytes(20).toString('hex') // hex = sem underscores
+  // Mesmo alfabeto usado em generateConfirmToken() do código de produção
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz'
+  const token = Array.from({ length: 16 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')
   const shift = await prisma.shift.findFirst({
     where: { restaurantId: restaurant.id, isActive: true },
     select: { id: true },
