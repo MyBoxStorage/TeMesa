@@ -8,7 +8,7 @@ import type {
 import { formatInTimeZone } from 'date-fns-tz'
 
 import { prisma } from '@/lib/prisma'
-import { sendWhatsApp } from '@/lib/zapi'
+import { sendWhatsApp, sendWhatsAppImage } from '@/lib/zapi'
 import { getResendClient } from '@/lib/resend'
 import { DEFAULT_TEMPLATES } from '@/lib/notification-templates'
 
@@ -77,7 +77,21 @@ export async function sendNotification(params: {
 
   if (whatsapp) {
     try {
-      await sendWhatsApp(reservation.guestPhone, interpolateTemplate(whatsapp, vars))
+      const text = interpolateTemplate(whatsapp, vars)
+
+      // RESERVATION_CREATED: se o restaurante tem cover/logo, envia
+      // foto + texto como uma única mensagem (image with caption).
+      // Para os demais gatilhos (lembretes, cancelamento, etc.) envia só texto.
+      const coverUrl =
+        trigger === 'RESERVATION_CREATED'
+          ? (reservation.restaurant.coverUrl ?? reservation.restaurant.logoUrl ?? null)
+          : null
+
+      if (coverUrl) {
+        await sendWhatsAppImage(reservation.guestPhone, coverUrl, text)
+      } else {
+        await sendWhatsApp(reservation.guestPhone, text)
+      }
     } catch (err) {
       console.error('[Notifications] WhatsApp falhou:', trigger, reservation.id, (err as Error).message)
     }

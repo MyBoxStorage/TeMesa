@@ -1,12 +1,11 @@
 import { TRPCError } from '@trpc/server'
-import { nanoid } from 'nanoid'
 import type { Prisma, ReservationStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { sendWidgetReservationEvents } from '@/lib/bcconnect'
 import { sendNotification } from '@/lib/notifications'
 import { createPixOrder } from '@/lib/pagarme'
-import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt } from '@/lib/reservationRules'
+import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, generateConfirmToken } from '@/lib/reservationRules'
 
 function widgetCustomerPreferencesJson(params: {
   dietaryNotes?: string
@@ -150,7 +149,7 @@ export async function createWidgetReservation(params: {
   })
   if (existing) throw new TRPCError({ code: 'CONFLICT', message: 'Já existe uma reserva ativa para este telefone' })
 
-  const token = nanoid(32)
+  const token = generateConfirmToken()
   const prefsJson = widgetCustomerPreferencesJson({
     dietaryNotes: params.dietaryNotes,
     originType: params.originType,

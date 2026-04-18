@@ -1,4 +1,14 @@
 import type { ReservationStatus } from '@prisma/client'
+import { customAlphabet } from 'nanoid'
+
+// Alfabeto sem caracteres especiais — gera tokens limpos na URL
+// Ex: temesa.vercel.app/confirmar/k4v3m8x2n9qr1p5w
+const tokenAlphabet = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 16)
+
+/** Gera um token de confirmação curto e sem caracteres especiais */
+export function generateConfirmToken(): string {
+  return tokenAlphabet()
+}
 
 export const ACTIVE_RESERVATION_STATUSES: ReservationStatus[] = [
   'PENDING',

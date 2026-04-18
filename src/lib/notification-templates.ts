@@ -16,7 +16,8 @@ export const DEFAULT_TEMPLATES: Record<
       '✅ *SIM* — estarei lá\n' +
       '❌ *NÃO* — preciso cancelar\n' +
       '━━━━━━━━━━━━━━━━\n\n' +
-      '_Ou acesse: {{confirmUrl}}_',
+      'Ou acesse:\n' +
+      '{{confirmUrl}}',
     EMAIL:
       'Reserva confirmada!\n\n' +
       'Olá {{guestName}}, sua reserva no {{restaurantName}} está confirmada.\n\n' +
@@ -70,7 +71,7 @@ export const DEFAULT_TEMPLATES: Record<
       '⚡ Você tem *15 minutos* para confirmar!\n\n' +
       '✅ *SIM* — quero a mesa\n' +
       '❌ *NÃO* — pode liberar\n\n' +
-      '_Ou acesse: {{confirmUrl}}_',
+      '{{confirmUrl}}',
     EMAIL:
       'Mesa disponível!\n\n' +
       'Olá {{guestName}}, uma mesa ficou disponível no {{restaurantName}}.\n' +

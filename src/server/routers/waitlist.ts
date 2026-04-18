@@ -1,8 +1,8 @@
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
-import { nanoid } from 'nanoid'
 
 import { sendWhatsApp } from '@/lib/zapi'
+import { generateConfirmToken } from '@/lib/reservationRules'
 import { publicProcedure, hostessProcedure, managerProcedure, staffProcedure, router } from '@/server/trpc'
 
 const e164 = z.string().regex(/^\+\d{10,15}$/)

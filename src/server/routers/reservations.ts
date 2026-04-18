@@ -5,7 +5,7 @@ import type { ReservationSource, ReservationStatus } from '@prisma/client'
 
 import { sendNotification } from '@/lib/notifications'
 import { sendBcEvent } from '@/lib/bcconnect'
-import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, reliabilityScore } from '@/lib/reservationRules'
+import { ACTIVE_RESERVATION_STATUSES, confirmTokenExpiresAt, reliabilityScore, generateConfirmToken } from '@/lib/reservationRules'
 import {
   type AuthedRestaurantCtx,
   hostessProcedure,
@@ -74,7 +74,7 @@ async function createReservationCore(params: {
     (restaurant.prepaymentConfig as Record<string, unknown>).prepayment_enabled === true
   const initialStatus: ReservationStatus = prepaymentActive ? 'PENDING_PAYMENT' : 'CONFIRMED'
 
-  const token = nanoid(32)
+  const token = generateConfirmToken()
   const expiresAt = confirmTokenExpiresAt(input.date)
 
   const customer = await ctx.prisma.customer.upsert({
