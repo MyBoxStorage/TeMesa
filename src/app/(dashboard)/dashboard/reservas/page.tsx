@@ -6,6 +6,7 @@ import { Plus, Search, SlidersHorizontal, List, Clock, Zap, CalendarDays } from 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Drawer, DrawerContent } from '@/components/ui/drawer'
 import { ReservationCard } from '@/components/reservas/reservation-card'
 import { ReservationDetail } from '@/components/reservas/reservation-detail'
 import { ReservationForm } from '@/components/reservas/reservation-form'
@@ -15,6 +16,7 @@ import { RES_DOT } from '@/components/common/status-badges'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { useDashboard } from '../dashboard-ctx'
+import { useIsMobile } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
 
 const STATUS_FILTERS = [
@@ -28,6 +30,7 @@ const STATUS_FILTERS = [
 export default function ReservasPage() {
   const { date: dashDate, restaurantId } = useDashboard()
   const dateStr = format(dashDate, 'yyyy-MM-dd')
+  const isMobile = useIsMobile()
 
   const [view, setView]             = useState<'list' | 'timeline'>('list')
   const [search, setSearch]         = useState('')
@@ -56,7 +59,6 @@ export default function ReservasPage() {
   )
   const widgetSlug = restaurantMeta?.slug ?? ''
 
-  // Verifica silenciosamente se o sinal Pix está ativo — usado só para o badge informativo
   const { data: paymentCfg } = api.restaurant.getPrepaymentConfig.useQuery(
     { restaurantId: restaurantId! },
     { enabled: !!restaurantId }
@@ -78,9 +80,10 @@ export default function ReservasPage() {
 
   return (
     <div className="flex h-full">
+      {/* Lista de reservas — no mobile sempre flex-1, no desktop split-view original */}
       <div className={cn(
         'flex flex-col border-r border-border bg-background transition-all duration-200',
-        selectedId ? 'w-[380px] shrink-0' : 'flex-1'
+        !isMobile && selectedId ? 'w-[380px] shrink-0' : 'flex-1'
       )}>
         <div className="px-4 py-3.5 border-b border-border space-y-3">
           <div className="flex items-center gap-2.5">
@@ -96,9 +99,20 @@ export default function ReservasPage() {
             <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl">
               <SlidersHorizontal className="w-4 h-4" />
             </Button>
-            <Button className="h-10 gap-2 text-[13px] font-semibold px-4 shrink-0 rounded-xl shadow-sm" onClick={() => setFormOpen(true)}>
+            <Button
+              className="h-10 gap-2 text-[13px] font-semibold px-4 shrink-0 rounded-xl shadow-sm hidden sm:inline-flex"
+              onClick={() => setFormOpen(true)}
+            >
               <Plus className="w-4 h-4" />
               Nova reserva
+            </Button>
+            {/* Mobile: botão compacto */}
+            <Button
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl shadow-sm sm:hidden"
+              onClick={() => setFormOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
             </Button>
           </div>
 
@@ -144,7 +158,8 @@ export default function ReservasPage() {
                 <Clock className="w-3 h-3" />
               </Button>
             </div>
-          </div>        </div>
+          </div>
+        </div>
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
@@ -248,21 +263,45 @@ export default function ReservasPage() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedId && selectedReservation && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.18 }}
-            className="flex-1 overflow-y-auto"
-          >
-            <ReservationDetail
-              reservation={selectedReservation as any}
-              restaurantId={restaurantId}
-              onClose={() => setSelectedId(null)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Desktop: painel lateral split-view (comportamento original) */}
+      {!isMobile && (
+        <AnimatePresence>
+          {selectedId && selectedReservation && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.18 }}
+              className="flex-1 overflow-y-auto"
+            >
+              <ReservationDetail
+                reservation={selectedReservation as any}
+                restaurantId={restaurantId}
+                onClose={() => setSelectedId(null)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* Mobile: Drawer bottom-sheet fullscreen */}
+      {isMobile && (
+        <Drawer
+          open={!!selectedId && !!selectedReservation}
+          onOpenChange={(open) => { if (!open) setSelectedId(null) }}
+        >
+          <DrawerContent className="max-h-[95vh] p-0 before:hidden bg-popover rounded-t-2xl border-t border-border">
+            <div className="mx-auto mt-2 mb-1 h-1.5 w-[60px] shrink-0 rounded-full bg-muted" />
+            {selectedReservation && (
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <ReservationDetail
+                  reservation={selectedReservation as any}
+                  restaurantId={restaurantId}
+                  onClose={() => setSelectedId(null)}
+                />
+              </div>
+            )}
+          </DrawerContent>
+        </Drawer>
+      )}
 
       <ReservationForm open={formOpen} onClose={() => setFormOpen(false)} restaurantId={restaurantId} />
     </div>

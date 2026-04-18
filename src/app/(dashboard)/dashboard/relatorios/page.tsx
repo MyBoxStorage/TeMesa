@@ -88,10 +88,10 @@ export default function RelatoriosPage() {
     : []
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-[18px] font-semibold">Relatórios</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px]" onClick={handleExportOcupacao} disabled={!occupancy?.length}>
             <Download className="w-3.5 h-3.5" /> CSV
           </Button>

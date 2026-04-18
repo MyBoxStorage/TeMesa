@@ -52,8 +52,8 @@ export default function WaitlistPage() {
   const waitlistUrl = `${baseUrl}/r/${restaurantInfo?.slug ?? ''}?waitlist=1`
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <div>
           <h1 className="text-[18px] font-semibold">Waitlist</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">
@@ -193,7 +193,7 @@ function WaitlistRow({ entry, highlight, onNotify }: { entry: any; highlight?: b
           <span className="text-[11px] text-muted-foreground">{entry.guestPhone}</span>
         </div>
       </div>
-      <div className="w-24 space-y-1">
+      <div className="w-20 sm:w-24 space-y-1 hidden sm:block">
         <div className="flex justify-between text-[10px] text-muted-foreground">
           <span>{waited}m</span><span>45m</span>
         </div>

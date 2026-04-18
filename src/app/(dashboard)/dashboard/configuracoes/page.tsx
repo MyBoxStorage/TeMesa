@@ -34,7 +34,7 @@ export default function ConfiguracoesPage() {
   if (!restaurantId) return null
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <h1 className="text-[18px] font-semibold mb-6">Configurações</h1>
 
       <div className="mb-5">
@@ -50,12 +50,12 @@ export default function ConfiguracoesPage() {
         </Link>
       </div>
 
-      <Tabs defaultValue="geral" orientation="vertical" className="flex gap-6">
-        <TabsList className="flex flex-col h-auto w-52 shrink-0 bg-muted/40 p-1.5 rounded-xl items-stretch gap-0.5">
+      <Tabs defaultValue="geral" orientation="vertical" className="flex flex-col md:flex-row gap-6">
+        <TabsList className="flex md:flex-col h-auto md:w-52 shrink-0 bg-muted/40 p-1.5 rounded-xl items-stretch gap-0.5 overflow-x-auto md:overflow-x-visible scrollbar-hide">
           {TABS.map(([value, label, Icon]) => (
             <TabsTrigger
               key={value} value={value}
-              className="group w-full justify-start gap-2.5 text-[13px] px-3 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg"
+              className="group justify-start gap-2.5 text-[13px] px-3 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap"
             >
               <Icon className="w-4 h-4 shrink-0 text-muted-foreground group-data-[state=active]:text-foreground" />
               {label}

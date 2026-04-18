@@ -256,7 +256,7 @@ export function ReservationDetail({ reservation, restaurantId, onClose }: Props)
       </Tabs>
 
       {/* Action buttons */}
-      <div className="px-4 py-3 border-t border-border bg-background/95 backdrop-blur-sm">
+      <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border bg-background/95 backdrop-blur-sm">
         <div className="flex gap-2 flex-wrap">
           {reservation.status === 'CONFIRMED' && (
             <Button size="sm" className="flex-1 h-11 text-[13px] gap-1.5 font-semibold bg-green-600 hover:bg-green-700 text-white"

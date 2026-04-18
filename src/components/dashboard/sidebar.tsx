@@ -192,6 +192,16 @@ export function Sidebar() {
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const { restaurantId } = useDashboard()
+  const dateStr = format(new Date(), 'yyyy-MM-dd')
+  const { data: todayReservations } = api.reservations.list.useQuery(
+    { restaurantId: restaurantId!, date: dateStr },
+    { enabled: !!restaurantId, refetchInterval: 30_000, retry: false }
+  )
+  const pendingCount = (todayReservations ?? []).filter(
+    r => ['PENDING', 'PENDING_PAYMENT', 'CONFIRMED'].includes(r.status)
+  ).length
+
   const MOBILE_NAV = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Visão geral' },
     { href: '/dashboard/reservas', icon: CalendarDays, label: 'Reservas' },
@@ -206,9 +216,17 @@ export function MobileBottomNav() {
         const active = href === '/dashboard'
           ? pathname === '/dashboard'
           : pathname.startsWith(href)
+        const showBadge = href === '/dashboard/reservas' && pendingCount > 0
         return (
-          <Link key={href} href={href} className="flex flex-col items-center gap-0.5 py-1 px-2 min-w-0">
-            <Icon className={cn('w-5 h-5 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
+          <Link key={href} href={href} className="relative flex flex-col items-center gap-0.5 py-1 px-2 min-w-0">
+            <div className="relative">
+              <Icon className={cn('w-5 h-5 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
+              {showBadge && (
+                <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center px-0.5 text-[8px] font-bold rounded-full bg-primary text-primary-foreground leading-none">
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
+            </div>
             <span className={cn('text-[9px] text-center leading-tight line-clamp-2 max-w-[76px]', active ? 'text-primary font-semibold' : 'text-muted-foreground')}>
               {label}
             </span>

@@ -43,7 +43,7 @@ export default function ClientesPage() {
   if (!restaurantId) return null
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[18px] font-semibold">Clientes</h1>
         <span className="text-[12px] text-muted-foreground">{customers?.length ?? 0} clientes</span>

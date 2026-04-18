@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
+import { useIsMobile } from '@/hooks/use-media-query'
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/field'
@@ -19,6 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { api } from '@/trpc/react'
 import { toast } from 'sonner'
 import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const schema = z.object({
   guestName:    z.string().min(2, 'Nome obrigatório'),
@@ -49,6 +51,7 @@ function toE164Local(raw: string): string {
 }
 
 export function ReservationForm({ open, onClose, restaurantId }: Props) {
+  const isMobile = useIsMobile()
   const utils = api.useUtils()
   const [noShowWarning, setNoShowWarning] = useState<{ name: string; count: number } | null>(null)
   const create = api.reservations.create.useMutation({
@@ -118,7 +121,15 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="right" className="w-[420px] sm:w-[480px] overflow-y-auto">
+      <SheetContent
+        side={isMobile ? 'bottom' : 'right'}
+        className={cn(
+          'overflow-y-auto',
+          isMobile
+            ? 'max-h-[92vh] rounded-t-2xl px-5 pb-[max(1rem,env(safe-area-inset-bottom))]'
+            : 'w-[420px] sm:w-[480px]'
+        )}
+      >
         <SheetHeader className="mb-6">
           <SheetTitle className="text-[16px]">Nova Reserva</SheetTitle>
         </SheetHeader>
@@ -135,7 +146,7 @@ export function ReservationForm({ open, onClose, restaurantId }: Props) {
             )} />
 
             {/* Phone + Email */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField control={form.control} name="guestPhone" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[12px]">WhatsApp *</FormLabel>
